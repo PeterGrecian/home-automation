@@ -1,0 +1,48 @@
+metadata:
+  name: Lab lights hourly on/off routine
+  description: Lights turn on at the start of each hour and off at the half hour, between 10:00 AM and 4:00 PM.
+
+automations:
+  # Turn on the lab lights at the start of each hour (10 AM to 4 PM)
+  - starters:
+      - type: time.schedule
+        at: 10:00
+      - type: time.schedule
+        at: 11:00
+      - type: time.schedule
+        at: 12:00
+      - type: time.schedule
+        at: 13:00
+      - type: time.schedule
+        at: 14:00
+      - type: time.schedule
+        at: 15:00
+      - type: time.schedule
+        at: 16:00
+    actions:
+      - type: device.command.OnOff
+        devices:
+          - Lab lights - Lab
+        on: true
+
+  # Turn off the lab lights at the half hour (10:30 AM to 4:30 PM)
+  - starters:
+      - type: time.schedule
+        at: 10:30
+      - type: time.schedule
+        at: 11:30
+      - type: time.schedule
+        at: 12:30
+      - type: time.schedule
+        at: 13:30
+      - type: time.schedule
+        at: 14:30
+      - type: time.schedule
+        at: 15:30
+      - type: time.schedule
+        at: 16:30
+    actions:
+      - type: device.command.OnOff
+        devices:
+          - Lab lights - Lab
+        on: false
