@@ -1,0 +1,24 @@
+metadata:
+  name: Lab lights on at sunset and off at 10:00 PM
+  description: Example of scheduled change of light brightness and close blinds.
+
+automations:
+  # Turn on the lab lights at sunset
+  - starters:
+      - type: time.schedule
+        at: SUNSET
+    actions:
+      - type: device.command.OnOff
+        devices:
+          - Lab lights - Lab
+        on: true
+
+  # Turn off the lab lights at 10:00 PM
+  - starters:
+      - type: time.schedule
+        at: 22:00 # HH:MM (24-hour format)
+    actions:
+      - type: device.command.OnOff
+        devices:
+          - Lab lights - Lab
+        on: false
