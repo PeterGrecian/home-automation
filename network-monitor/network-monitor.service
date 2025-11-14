@@ -1,0 +1,19 @@
+[Unit]
+Description=Network Device Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/network-monitor
+ExecStart=/usr/bin/python3 /home/pi/network-monitor/monitor.py
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

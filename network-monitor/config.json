@@ -1,0 +1,5 @@
+{
+  "subnet": "192.168.4.0/22",
+  "discovery_interval_seconds": 600,
+  "polling_interval_seconds": 60
+}

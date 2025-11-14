@@ -1,0 +1,6 @@
+# No external Python packages required
+# Uses only standard library
+
+# Optional but recommended:
+# Install system packages:
+# sudo apt-get install -y arp-scan nmap
