@@ -10,6 +10,7 @@ import time
 import subprocess
 import json
 import csv
+import requests
 from datetime import datetime
 from typing import Dict, Set, Optional
 import logging
@@ -25,6 +26,70 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+
+class MacVendorLookup:
+    """Look up device manufacturer from MAC address"""
+    
+    def __init__(self):
+        self.cache = {}
+        self.hostname_counts = {}
+    
+    def get_vendor(self, mac: str) -> str:
+        """Get vendor name from MAC address OUI"""
+        if mac in self.cache:
+            return self.cache[mac]
+        
+        # Extract OUI (first 3 octets)
+        oui = mac.replace(':', '').replace('-', '').upper()[:6]
+        
+        # Try online lookup first
+        try:
+            response = requests.get(
+                f'https://api.maclookup.app/v2/macs/{oui}',
+                timeout=2
+            )
+            if response.status_code == 200:
+                data = response.json()
+                vendor = data.get('company', 'Unknown')
+                self.cache[mac] = vendor
+                return vendor
+        except:
+            pass
+        
+        # Fallback to common vendors
+        common_vendors = {
+            '74B6B6': 'Eero',
+            '1C6499': 'Unknown IoT',
+            '0050B6': 'Unknown Device',
+            'AC6784': 'Unknown Device',
+            'E4F042': 'Unknown Device',
+            # Add more as you discover them
+        }
+        
+        vendor = common_vendors.get(oui, 'Unknown')
+        self.cache[mac] = vendor
+        return vendor
+    
+    def generate_hostname(self, mac: str, ip: str, dns_hostname: str = None) -> str:
+        """Generate a friendly hostname from MAC vendor"""
+        if dns_hostname and dns_hostname != ip:
+            return dns_hostname
+        
+        vendor = self.get_vendor(mac)
+        last4 = mac.replace(':', '')[-4:].upper()
+        
+        # Clean up vendor name
+        vendor_clean = vendor.replace(',', '').replace(' ', '-')
+        base_hostname = f"{vendor_clean}-{last4}"
+        
+        # Handle duplicates
+        if base_hostname in self.hostname_counts:
+            self.hostname_counts[base_hostname] += 1
+            return f"{base_hostname}-{self.hostname_counts[base_hostname]}"
+        else:
+            self.hostname_counts[base_hostname] = 1
+            return base_hostname
 
 
 class DeviceDatabase:
@@ -192,6 +257,7 @@ class NetworkScanner:
     
     def __init__(self, subnet: str):
         self.subnet = subnet
+        self.mac_lookup = MacVendorLookup()
     
     def scan(self) -> Dict[str, tuple]:
         """
@@ -214,7 +280,8 @@ class NetworkScanner:
                     ip = parts[0]
                     mac = parts[1].lower()
                     
-                    hostname = self._get_hostname(ip)
+                    dns_hostname = self._get_hostname(ip)
+                    hostname = self.mac_lookup.generate_hostname(mac, ip, dns_hostname)
                     devices[mac] = (ip, hostname)
             
         except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -242,7 +309,8 @@ class NetworkScanner:
                     
                     mac = self._get_mac(ip)
                     if mac:
-                        hostname = self._get_hostname(ip)
+                        dns_hostname = self._get_hostname(ip)
+                        hostname = self.mac_lookup.generate_hostname(mac, ip, dns_hostname)
                         devices[mac] = (ip, hostname)
         
         except subprocess.TimeoutExpired:
@@ -322,6 +390,18 @@ class NetworkMonitor:
         
         while self.running:
             try:
+                # Pre-populate ARP cache to ensure all devices are visible
+                logger.info("Pre-populating ARP cache with ping sweep...")
+                try:
+                    subprocess.run(
+                        ['fping', '-g', '-q', '-r', '0', self.config['subnet']],
+                        timeout=60,
+                        capture_output=True
+                    )
+                except (subprocess.TimeoutExpired, FileNotFoundError):
+                    # fping not available, skip pre-population
+                    logger.warning("fping not available, skipping ARP cache pre-population")
+                
                 logger.info(f"Starting network scan of {self.config['subnet']}")
                 devices = self.scanner.scan()
                 logger.info(f"Scan complete: found {len(devices)} devices")

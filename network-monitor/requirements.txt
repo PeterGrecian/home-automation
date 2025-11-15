@@ -1,6 +1,9 @@
-# No external Python packages required
+# No external Python packages required for basic operation
 # Uses only standard library
 
-# Optional but recommended:
-# Install system packages:
-# sudo apt-get install -y arp-scan nmap
+# Optional packages for enhanced functionality:
+# requests - for online MAC vendor lookup (recommended)
+# pip install requests
+
+# System packages (required):
+# sudo apt-get install -y arp-scan nmap fping
