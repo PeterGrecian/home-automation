@@ -155,11 +155,21 @@ Run with `sudo` - required for network scanning.
 
 Your network is large (192.168.4.0/22 = ~1024 IPs). Discovery takes longer but polling is fast. Consider increasing `discovery_interval_seconds` to 900 (15 min) or 1200 (20 min).
 
+### "Database is locked" errors
+
+The updated version includes:
+- WAL mode for concurrent access
+- Automatic retry logic with exponential backoff
+- 30-second timeout for all operations
+- Thread-safe locking mechanisms
+
+If you still see this, make sure only one instance is running.
+
 ## Customization
 
 ### Change network interface
 
-Edit `monitor.py`, line ~112:
+Edit `monitor.py`, find the arp-scan line:
 ```python
 ['sudo', 'arp-scan', '--interface=wlan0', self.subnet],  # Change eth0 to wlan0
 ```

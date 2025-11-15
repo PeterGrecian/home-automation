@@ -32,7 +32,7 @@ class DeviceDatabase:
     
     def __init__(self, db_path='devices.db'):
         self.db_path = db_path
-        self.lock = threading.RLock()  # Use RLock for reentrant locking
+        self.lock = threading.RLock()
         self._init_db()
     
     def _init_db(self):
@@ -41,26 +41,26 @@ class DeviceDatabase:
         conn.execute('PRAGMA journal_mode=WAL')
         conn.execute('PRAGMA busy_timeout=30000')
         conn.execute('''
-                CREATE TABLE IF NOT EXISTS devices (
-                    mac TEXT PRIMARY KEY,
-                    ip TEXT,
-                    hostname TEXT,
-                    first_seen TEXT,
-                    last_seen TEXT,
-                    status TEXT DEFAULT 'unknown'
-                )
-            ''')
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT,
-                    mac TEXT,
-                    ip TEXT,
-                    hostname TEXT,
-                    event_type TEXT,
-                    FOREIGN KEY (mac) REFERENCES devices (mac)
-                )
-            ''')
+            CREATE TABLE IF NOT EXISTS devices (
+                mac TEXT PRIMARY KEY,
+                ip TEXT,
+                hostname TEXT,
+                first_seen TEXT,
+                last_seen TEXT,
+                status TEXT DEFAULT 'unknown'
+            )
+        ''')
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                mac TEXT,
+                ip TEXT,
+                hostname TEXT,
+                event_type TEXT,
+                FOREIGN KEY (mac) REFERENCES devices (mac)
+            )
+        ''')
         conn.commit()
         conn.close()
     
@@ -71,30 +71,27 @@ class DeviceDatabase:
             try:
                 with self.lock:
                     with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
-                now = datetime.now().isoformat()
-                cursor = conn.cursor()
-                
-                # Check if device exists
-                cursor.execute('SELECT mac, status FROM devices WHERE mac = ?', (mac,))
-                existing = cursor.fetchone()
-                
-                if existing:
-                    # Update existing device
-                    cursor.execute('''
-                        UPDATE devices 
-                        SET ip = ?, hostname = ?, last_seen = ?
-                        WHERE mac = ?
-                    ''', (ip, hostname or existing[0], now, mac))
-                else:
-                    # Insert new device
-                    cursor.execute('''
-                        INSERT INTO devices (mac, ip, hostname, first_seen, last_seen, status)
-                        VALUES (?, ?, ?, ?, ?, 'online')
-                    ''', (mac, ip, hostname, now, now))
-                    self.log_event(mac, ip, hostname, 'discovered')
-                    logger.info(f"New device discovered: {hostname or ip} ({mac})")
-                
-                conn.commit()
+                        now = datetime.now().isoformat()
+                        cursor = conn.cursor()
+                        
+                        cursor.execute('SELECT mac, status FROM devices WHERE mac = ?', (mac,))
+                        existing = cursor.fetchone()
+                        
+                        if existing:
+                            cursor.execute('''
+                                UPDATE devices 
+                                SET ip = ?, hostname = ?, last_seen = ?
+                                WHERE mac = ?
+                            ''', (ip, hostname or existing[0], now, mac))
+                        else:
+                            cursor.execute('''
+                                INSERT INTO devices (mac, ip, hostname, first_seen, last_seen, status)
+                                VALUES (?, ?, ?, ?, ?, 'online')
+                            ''', (mac, ip, hostname, now, now))
+                            self.log_event(mac, ip, hostname, 'discovered')
+                            logger.info(f"New device discovered: {hostname or ip} ({mac})")
+                        
+                        conn.commit()
                 break
             except sqlite3.OperationalError as e:
                 if attempt < max_retries - 1:
@@ -110,24 +107,24 @@ class DeviceDatabase:
             try:
                 with self.lock:
                     with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
-                cursor = conn.cursor()
-                cursor.execute('SELECT status, ip, hostname FROM devices WHERE mac = ?', (mac,))
-                result = cursor.fetchone()
-                
-                if result and result[0] != status:
-                    old_status = result[0]
-                    ip, hostname = result[1], result[2]
-                    
-                    cursor.execute('''
-                        UPDATE devices SET status = ?, last_seen = ?
-                        WHERE mac = ?
-                    ''', (status, datetime.now().isoformat(), mac))
-                    
-                    event_type = 'online' if status == 'online' else 'offline'
-                    self.log_event(mac, ip, hostname, event_type)
-                    
-                    logger.info(f"Device {hostname or ip} ({mac}): {old_status} -> {status}")
-                    conn.commit()
+                        cursor = conn.cursor()
+                        cursor.execute('SELECT status, ip, hostname FROM devices WHERE mac = ?', (mac,))
+                        result = cursor.fetchone()
+                        
+                        if result and result[0] != status:
+                            old_status = result[0]
+                            ip, hostname = result[1], result[2]
+                            
+                            cursor.execute('''
+                                UPDATE devices SET status = ?, last_seen = ?
+                                WHERE mac = ?
+                            ''', (status, datetime.now().isoformat(), mac))
+                            
+                            event_type = 'online' if status == 'online' else 'offline'
+                            self.log_event(mac, ip, hostname, event_type)
+                            
+                            logger.info(f"Device {hostname or ip} ({mac}): {old_status} -> {status}")
+                            conn.commit()
                 break
             except sqlite3.OperationalError as e:
                 if attempt < max_retries - 1:
@@ -142,24 +139,39 @@ class DeviceDatabase:
         for attempt in range(max_retries):
             try:
                 with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
-            conn.execute('''
-                INSERT INTO events (timestamp, mac, ip, hostname, event_type)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (datetime.now().isoformat(), mac, ip, hostname, event_type))
-            conn.commit()
+                    conn.execute('''
+                        INSERT INTO events (timestamp, mac, ip, hostname, event_type)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (datetime.now().isoformat(), mac, ip, hostname, event_type))
+                    conn.commit()
+                break
+            except sqlite3.OperationalError as e:
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)
+                else:
+                    logger.error(f"Failed to log event after {max_retries} attempts: {e}")
     
     def get_all_devices(self) -> list:
         """Get all known devices"""
-        with self.lock:
-            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
-                cursor = conn.cursor()
-                cursor.execute('SELECT mac, ip, hostname, status FROM devices')
-                return cursor.fetchall()
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with self.lock:
+                    with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute('SELECT mac, ip, hostname, status FROM devices')
+                        return cursor.fetchall()
+            except sqlite3.OperationalError as e:
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)
+                else:
+                    logger.error(f"Failed to get devices after {max_retries} attempts: {e}")
+                    return []
     
     def export_events_to_csv(self, filename='events_export.csv'):
         """Export all events to CSV for analysis"""
         with self.lock:
-            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+            with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
                     SELECT timestamp, mac, ip, hostname, event_type 
@@ -189,7 +201,6 @@ class NetworkScanner:
         devices = {}
         
         try:
-            # Try arp-scan first (fastest, requires sudo)
             result = subprocess.run(
                 ['sudo', 'arp-scan', '--interface=eth0', self.subnet],
                 capture_output=True,
@@ -203,12 +214,10 @@ class NetworkScanner:
                     ip = parts[0]
                     mac = parts[1].lower()
                     
-                    # Try to get hostname
                     hostname = self._get_hostname(ip)
                     devices[mac] = (ip, hostname)
             
         except (subprocess.TimeoutExpired, FileNotFoundError):
-            # Fallback to nmap if arp-scan not available
             logger.warning("arp-scan failed, falling back to nmap")
             devices = self._nmap_scan()
         
@@ -231,7 +240,6 @@ class NetworkScanner:
                     parts = line.split()
                     ip = parts[1]
                     
-                    # Get MAC from arp cache
                     mac = self._get_mac(ip)
                     if mac:
                         hostname = self._get_hostname(ip)
