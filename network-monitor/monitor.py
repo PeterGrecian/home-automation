@@ -32,14 +32,15 @@ class DeviceDatabase:
     
     def __init__(self, db_path='devices.db'):
         self.db_path = db_path
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()  # Use RLock for reentrant locking
         self._init_db()
     
     def _init_db(self):
         """Initialize database schema"""
-        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
-            conn.execute('PRAGMA journal_mode=WAL')
-            conn.execute('''
+        conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA busy_timeout=30000')
+        conn.execute('''
                 CREATE TABLE IF NOT EXISTS devices (
                     mac TEXT PRIMARY KEY,
                     ip TEXT,
@@ -60,12 +61,16 @@ class DeviceDatabase:
                     FOREIGN KEY (mac) REFERENCES devices (mac)
                 )
             ''')
-            conn.commit()
+        conn.commit()
+        conn.close()
     
     def add_or_update_device(self, mac: str, ip: str, hostname: str = None):
         """Add new device or update existing one"""
-        with self.lock:
-            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with self.lock:
+                    with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
                 now = datetime.now().isoformat()
                 cursor = conn.cursor()
                 
@@ -90,11 +95,21 @@ class DeviceDatabase:
                     logger.info(f"New device discovered: {hostname or ip} ({mac})")
                 
                 conn.commit()
+                break
+            except sqlite3.OperationalError as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Database locked, retrying... ({attempt + 1}/{max_retries})")
+                    time.sleep(0.5)
+                else:
+                    logger.error(f"Failed to add/update device after {max_retries} attempts: {e}")
     
     def update_device_status(self, mac: str, status: str):
         """Update device online/offline status"""
-        with self.lock:
-            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with self.lock:
+                    with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
                 cursor = conn.cursor()
                 cursor.execute('SELECT status, ip, hostname FROM devices WHERE mac = ?', (mac,))
                 result = cursor.fetchone()
@@ -113,10 +128,20 @@ class DeviceDatabase:
                     
                     logger.info(f"Device {hostname or ip} ({mac}): {old_status} -> {status}")
                     conn.commit()
+                break
+            except sqlite3.OperationalError as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Database locked, retrying... ({attempt + 1}/{max_retries})")
+                    time.sleep(0.5)
+                else:
+                    logger.error(f"Failed to update device status after {max_retries} attempts: {e}")
     
     def log_event(self, mac: str, ip: str, hostname: str, event_type: str):
         """Log device event"""
-        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
             conn.execute('''
                 INSERT INTO events (timestamp, mac, ip, hostname, event_type)
                 VALUES (?, ?, ?, ?, ?)
