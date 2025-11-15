@@ -37,7 +37,8 @@ class DeviceDatabase:
     
     def _init_db(self):
         """Initialize database schema"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+            conn.execute('PRAGMA journal_mode=WAL')
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS devices (
                     mac TEXT PRIMARY KEY,
@@ -64,7 +65,7 @@ class DeviceDatabase:
     def add_or_update_device(self, mac: str, ip: str, hostname: str = None):
         """Add new device or update existing one"""
         with self.lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
                 now = datetime.now().isoformat()
                 cursor = conn.cursor()
                 
@@ -93,7 +94,7 @@ class DeviceDatabase:
     def update_device_status(self, mac: str, status: str):
         """Update device online/offline status"""
         with self.lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
                 cursor = conn.cursor()
                 cursor.execute('SELECT status, ip, hostname FROM devices WHERE mac = ?', (mac,))
                 result = cursor.fetchone()
@@ -115,7 +116,7 @@ class DeviceDatabase:
     
     def log_event(self, mac: str, ip: str, hostname: str, event_type: str):
         """Log device event"""
-        with sqlite3.connect(self.db_path) as conn:
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             conn.execute('''
                 INSERT INTO events (timestamp, mac, ip, hostname, event_type)
                 VALUES (?, ?, ?, ?, ?)
@@ -125,7 +126,7 @@ class DeviceDatabase:
     def get_all_devices(self) -> list:
         """Get all known devices"""
         with self.lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
                 cursor = conn.cursor()
                 cursor.execute('SELECT mac, ip, hostname, status FROM devices')
                 return cursor.fetchall()
@@ -133,7 +134,7 @@ class DeviceDatabase:
     def export_events_to_csv(self, filename='events_export.csv'):
         """Export all events to CSV for analysis"""
         with self.lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
                     SELECT timestamp, mac, ip, hostname, event_type 
