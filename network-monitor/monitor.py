@@ -60,11 +60,10 @@ class MacVendorLookup:
         # Fallback to common vendors
         common_vendors = {
             '74B6B6': 'Eero',
-            '1C6499': 'Unknown IoT',
-            '0050B6': 'Unknown Device',
-            'AC6784': 'Unknown Device',
-            'E4F042': 'Unknown Device',
-            # Add more as you discover them
+            '1C6499': 'Unknown-IoT',
+            '0050B6': 'Unknown-Device',
+            'AC6784': 'Unknown-Device',
+            'E4F042': 'Unknown-Device',
         }
         
         vendor = common_vendors.get(oui, 'Unknown')
@@ -132,6 +131,8 @@ class DeviceDatabase:
     def add_or_update_device(self, mac: str, ip: str, hostname: str = None):
         """Add new device or update existing one"""
         max_retries = 3
+        should_log_discovery = False
+        
         for attempt in range(max_retries):
             try:
                 with self.lock:
@@ -153,10 +154,14 @@ class DeviceDatabase:
                                 INSERT INTO devices (mac, ip, hostname, first_seen, last_seen, status)
                                 VALUES (?, ?, ?, ?, ?, 'online')
                             ''', (mac, ip, hostname, now, now))
-                            self.log_event(mac, ip, hostname, 'discovered')
+                            should_log_discovery = True
                             logger.info(f"New device discovered: {hostname or ip} ({mac})")
                         
                         conn.commit()
+                
+                # Log event AFTER connection is closed
+                if should_log_discovery:
+                    self.log_event(mac, ip, hostname, 'discovered')
                 break
             except sqlite3.OperationalError as e:
                 if attempt < max_retries - 1:
@@ -168,6 +173,9 @@ class DeviceDatabase:
     def update_device_status(self, mac: str, status: str):
         """Update device online/offline status"""
         max_retries = 3
+        should_log_event = False
+        event_data = None
+        
         for attempt in range(max_retries):
             try:
                 with self.lock:
@@ -186,10 +194,15 @@ class DeviceDatabase:
                             ''', (status, datetime.now().isoformat(), mac))
                             
                             event_type = 'online' if status == 'online' else 'offline'
-                            self.log_event(mac, ip, hostname, event_type)
+                            should_log_event = True
+                            event_data = (mac, ip, hostname, event_type)
                             
                             logger.info(f"Device {hostname or ip} ({mac}): {old_status} -> {status}")
                             conn.commit()
+                
+                # Log event AFTER connection is closed
+                if should_log_event and event_data:
+                    self.log_event(*event_data)
                 break
             except sqlite3.OperationalError as e:
                 if attempt < max_retries - 1:
@@ -199,20 +212,23 @@ class DeviceDatabase:
                     logger.error(f"Failed to update device status after {max_retries} attempts: {e}")
     
     def log_event(self, mac: str, ip: str, hostname: str, event_type: str):
-        """Log device event"""
-        max_retries = 3
+        """Log device event - must be called OUTSIDE of other database transactions"""
+        max_retries = 5
         for attempt in range(max_retries):
             try:
-                with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
+                with self.lock:
+                    conn = sqlite3.connect(self.db_path, timeout=30.0)
+                    conn.execute('PRAGMA busy_timeout=30000')
                     conn.execute('''
                         INSERT INTO events (timestamp, mac, ip, hostname, event_type)
                         VALUES (?, ?, ?, ?, ?)
                     ''', (datetime.now().isoformat(), mac, ip, hostname, event_type))
                     conn.commit()
+                    conn.close()
                 break
             except sqlite3.OperationalError as e:
                 if attempt < max_retries - 1:
-                    time.sleep(0.5)
+                    time.sleep(1.0)
                 else:
                     logger.error(f"Failed to log event after {max_retries} attempts: {e}")
     
@@ -399,7 +415,6 @@ class NetworkMonitor:
                         capture_output=True
                     )
                 except (subprocess.TimeoutExpired, FileNotFoundError):
-                    # fping not available, skip pre-population
                     logger.warning("fping not available, skipping ARP cache pre-population")
                 
                 logger.info(f"Starting network scan of {self.config['subnet']}")
@@ -470,3 +485,5 @@ class NetworkMonitor:
 if __name__ == '__main__':
     monitor = NetworkMonitor()
     monitor.start()
+    
+
