@@ -2,17 +2,16 @@
 """
 Network Device Monitor
 Tracks device online/offline status with auto-discovery
+Uses simple text files instead of database
 """
 
-import sqlite3
 import threading
 import time
 import subprocess
 import json
-import csv
-import requests
+import os
 from datetime import datetime
-from typing import Dict, Set, Optional
+from typing import Dict, Optional
 import logging
 import sys
 
@@ -45,6 +44,7 @@ class MacVendorLookup:
         
         # Try online lookup first
         try:
+            import requests
             response = requests.get(
                 f'https://api.maclookup.app/v2/macs/{oui}',
                 timeout=2
@@ -60,10 +60,10 @@ class MacVendorLookup:
         # Fallback to common vendors
         common_vendors = {
             '74B6B6': 'Eero',
-            '1C6499': 'Unknown-IoT',
-            '0050B6': 'Unknown-Device',
-            'AC6784': 'Unknown-Device',
-            'E4F042': 'Unknown-Device',
+            '1C6499': 'UnknownIoT',
+            '0050B6': 'UnknownDevice',
+            'AC6784': 'UnknownDevice',
+            'E4F042': 'UnknownDevice',
         }
         
         vendor = common_vendors.get(oui, 'Unknown')
@@ -73,13 +73,15 @@ class MacVendorLookup:
     def generate_hostname(self, mac: str, ip: str, dns_hostname: str = None) -> str:
         """Generate a friendly hostname from MAC vendor"""
         if dns_hostname and dns_hostname != ip:
-            return dns_hostname
+            # Clean up DNS hostname
+            clean_dns = dns_hostname.replace('.', '-').replace(' ', '-')
+            return clean_dns
         
         vendor = self.get_vendor(mac)
         last4 = mac.replace(':', '')[-4:].upper()
         
-        # Clean up vendor name
-        vendor_clean = vendor.replace(',', '').replace(' ', '-')
+        # Clean up vendor name for filename
+        vendor_clean = vendor.replace(',', '').replace(' ', '').replace('.', '')
         base_hostname = f"{vendor_clean}-{last4}"
         
         # Handle duplicates
@@ -91,181 +93,117 @@ class MacVendorLookup:
             return base_hostname
 
 
-class DeviceDatabase:
-    """SQLite database manager for device tracking"""
+class DeviceTracker:
+    """File-based device tracking"""
     
-    def __init__(self, db_path='devices.db'):
-        self.db_path = db_path
-        self.lock = threading.RLock()
-        self._init_db()
+    def __init__(self, devices_dir='devices'):
+        self.devices_dir = devices_dir
+        self.lock = threading.Lock()
+        self.device_states = {}  # {mac: {'hostname': str, 'ip': str, 'status': str, 'last_change': datetime}}
+        
+        # Create devices directory if it doesn't exist
+        os.makedirs(self.devices_dir, exist_ok=True)
+        
+        # Load existing device states
+        self._load_device_states()
     
-    def _init_db(self):
-        """Initialize database schema"""
-        conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
-        conn.execute('PRAGMA journal_mode=WAL')
-        conn.execute('PRAGMA busy_timeout=30000')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS devices (
-                mac TEXT PRIMARY KEY,
-                ip TEXT,
-                hostname TEXT,
-                first_seen TEXT,
-                last_seen TEXT,
-                status TEXT DEFAULT 'unknown'
-            )
-        ''')
-        conn.execute('''
-            CREATE TABLE IF NOT EXISTS events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                mac TEXT,
-                ip TEXT,
-                hostname TEXT,
-                event_type TEXT,
-                FOREIGN KEY (mac) REFERENCES devices (mac)
-            )
-        ''')
-        conn.commit()
-        conn.close()
+    def _load_device_states(self):
+        """Load device states from existing files"""
+        if not os.path.exists(self.devices_dir):
+            return
+        
+        for filename in os.listdir(self.devices_dir):
+            filepath = os.path.join(self.devices_dir, filename)
+            if os.path.isfile(filepath):
+                try:
+                    with open(filepath, 'r') as f:
+                        lines = f.readlines()
+                        if lines:
+                            # Parse last line to get current state
+                            last_line = lines[-1].strip()
+                            if last_line:
+                                parts = last_line.split(',')
+                                if len(parts) >= 4:
+                                    timestamp_str = parts[0]
+                                    ip = parts[1]
+                                    mac = parts[2]
+                                    status = parts[3]
+                                    
+                                    self.device_states[mac] = {
+                                        'hostname': filename,
+                                        'ip': ip,
+                                        'status': status,
+                                        'last_change': datetime.fromisoformat(timestamp_str)
+                                    }
+                except Exception as e:
+                    logger.error(f"Error loading device state from {filename}: {e}")
     
-    def add_or_update_device(self, mac: str, ip: str, hostname: str = None):
+    def _get_filename(self, hostname: str) -> str:
+        """Get safe filename for device"""
+        # Remove any unsafe characters
+        safe_name = ''.join(c for c in hostname if c.isalnum() or c in '-_')
+        return safe_name
+    
+    def add_or_update_device(self, mac: str, ip: str, hostname: str):
         """Add new device or update existing one"""
-        max_retries = 3
-        should_log_discovery = False
-        
-        for attempt in range(max_retries):
-            try:
-                with self.lock:
-                    with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
-                        now = datetime.now().isoformat()
-                        cursor = conn.cursor()
-                        
-                        cursor.execute('SELECT mac, status FROM devices WHERE mac = ?', (mac,))
-                        existing = cursor.fetchone()
-                        
-                        if existing:
-                            cursor.execute('''
-                                UPDATE devices 
-                                SET ip = ?, hostname = ?, last_seen = ?
-                                WHERE mac = ?
-                            ''', (ip, hostname or existing[0], now, mac))
-                        else:
-                            cursor.execute('''
-                                INSERT INTO devices (mac, ip, hostname, first_seen, last_seen, status)
-                                VALUES (?, ?, ?, ?, ?, 'online')
-                            ''', (mac, ip, hostname, now, now))
-                            should_log_discovery = True
-                            logger.info(f"New device discovered: {hostname or ip} ({mac})")
-                        
-                        conn.commit()
+        with self.lock:
+            now = datetime.now()
+            
+            # Check if device exists
+            if mac in self.device_states:
+                # Update IP if changed
+                self.device_states[mac]['ip'] = ip
+            else:
+                # New device
+                self.device_states[mac] = {
+                    'hostname': hostname,
+                    'ip': ip,
+                    'status': 'online',
+                    'last_change': now
+                }
                 
-                # Log event AFTER connection is closed
-                if should_log_discovery:
-                    self.log_event(mac, ip, hostname, 'discovered')
-                break
-            except sqlite3.OperationalError as e:
-                if attempt < max_retries - 1:
-                    logger.warning(f"Database locked, retrying... ({attempt + 1}/{max_retries})")
-                    time.sleep(0.5)
-                else:
-                    logger.error(f"Failed to add/update device after {max_retries} attempts: {e}")
+                # Create new file with initial entry
+                filename = self._get_filename(hostname)
+                filepath = os.path.join(self.devices_dir, filename)
+                
+                with open(filepath, 'a') as f:
+                    f.write(f"{now.isoformat()},{ip},{mac},online,0\n")
+                
+                logger.info(f"New device discovered: {hostname} ({mac}) at {ip}")
     
-    def update_device_status(self, mac: str, status: str):
+    def update_device_status(self, mac: str, new_status: str):
         """Update device online/offline status"""
-        max_retries = 3
-        should_log_event = False
-        event_data = None
-        
-        for attempt in range(max_retries):
-            try:
-                with self.lock:
-                    with sqlite3.connect(self.db_path, timeout=30.0, isolation_level='IMMEDIATE') as conn:
-                        cursor = conn.cursor()
-                        cursor.execute('SELECT status, ip, hostname FROM devices WHERE mac = ?', (mac,))
-                        result = cursor.fetchone()
-                        
-                        if result and result[0] != status:
-                            old_status = result[0]
-                            ip, hostname = result[1], result[2]
-                            
-                            cursor.execute('''
-                                UPDATE devices SET status = ?, last_seen = ?
-                                WHERE mac = ?
-                            ''', (status, datetime.now().isoformat(), mac))
-                            
-                            event_type = 'online' if status == 'online' else 'offline'
-                            should_log_event = True
-                            event_data = (mac, ip, hostname, event_type)
-                            
-                            logger.info(f"Device {hostname or ip} ({mac}): {old_status} -> {status}")
-                            conn.commit()
+        with self.lock:
+            if mac not in self.device_states:
+                return
+            
+            device = self.device_states[mac]
+            old_status = device['status']
+            
+            # Only log if status actually changed
+            if old_status != new_status:
+                now = datetime.now()
+                last_change = device['last_change']
+                interval_seconds = (now - last_change).total_seconds()
                 
-                # Log event AFTER connection is closed
-                if should_log_event and event_data:
-                    self.log_event(*event_data)
-                break
-            except sqlite3.OperationalError as e:
-                if attempt < max_retries - 1:
-                    logger.warning(f"Database locked, retrying... ({attempt + 1}/{max_retries})")
-                    time.sleep(0.5)
-                else:
-                    logger.error(f"Failed to update device status after {max_retries} attempts: {e}")
-    
-    def log_event(self, mac: str, ip: str, hostname: str, event_type: str):
-        """Log device event - must be called OUTSIDE of other database transactions"""
-        max_retries = 5
-        for attempt in range(max_retries):
-            try:
-                with self.lock:
-                    conn = sqlite3.connect(self.db_path, timeout=30.0)
-                    conn.execute('PRAGMA busy_timeout=30000')
-                    conn.execute('''
-                        INSERT INTO events (timestamp, mac, ip, hostname, event_type)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (datetime.now().isoformat(), mac, ip, hostname, event_type))
-                    conn.commit()
-                    conn.close()
-                break
-            except sqlite3.OperationalError as e:
-                if attempt < max_retries - 1:
-                    time.sleep(1.0)
-                else:
-                    logger.error(f"Failed to log event after {max_retries} attempts: {e}")
+                # Update state
+                device['status'] = new_status
+                device['last_change'] = now
+                
+                # Append to file
+                filename = self._get_filename(device['hostname'])
+                filepath = os.path.join(self.devices_dir, filename)
+                
+                with open(filepath, 'a') as f:
+                    f.write(f"{now.isoformat()},{device['ip']},{mac},{new_status},{interval_seconds:.1f}\n")
+                
+                logger.info(f"Device {device['hostname']} ({mac}): {old_status} -> {new_status} (after {interval_seconds:.1f}s)")
     
     def get_all_devices(self) -> list:
         """Get all known devices"""
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                with self.lock:
-                    with sqlite3.connect(self.db_path, timeout=30.0) as conn:
-                        cursor = conn.cursor()
-                        cursor.execute('SELECT mac, ip, hostname, status FROM devices')
-                        return cursor.fetchall()
-            except sqlite3.OperationalError as e:
-                if attempt < max_retries - 1:
-                    time.sleep(0.5)
-                else:
-                    logger.error(f"Failed to get devices after {max_retries} attempts: {e}")
-                    return []
-    
-    def export_events_to_csv(self, filename='events_export.csv'):
-        """Export all events to CSV for analysis"""
         with self.lock:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    SELECT timestamp, mac, ip, hostname, event_type 
-                    FROM events 
-                    ORDER BY timestamp
-                ''')
-                
-                with open(filename, 'w', newline='') as csvfile:
-                    writer = csv.writer(csvfile)
-                    writer.writerow(['Timestamp', 'MAC', 'IP', 'Hostname', 'Event'])
-                    writer.writerows(cursor.fetchall())
-                
-                logger.info(f"Events exported to {filename}")
+            return [(mac, data['ip'], data['hostname'], data['status']) 
+                    for mac, data in self.device_states.items()]
 
 
 class NetworkScanner:
@@ -395,7 +333,7 @@ class NetworkMonitor:
         with open(config_path, 'r') as f:
             self.config = json.load(f)
         
-        self.db = DeviceDatabase()
+        self.tracker = DeviceTracker()
         self.scanner = NetworkScanner(self.config['subnet'])
         self.pinger = DevicePinger()
         self.running = False
@@ -422,8 +360,8 @@ class NetworkMonitor:
                 logger.info(f"Scan complete: found {len(devices)} devices")
                 
                 for mac, (ip, hostname) in devices.items():
-                    self.db.add_or_update_device(mac, ip, hostname)
-                    self.db.update_device_status(mac, 'online')
+                    self.tracker.add_or_update_device(mac, ip, hostname)
+                    self.tracker.update_device_status(mac, 'online')
                 
                 time.sleep(self.config['discovery_interval_seconds'])
             
@@ -437,14 +375,14 @@ class NetworkMonitor:
         
         while self.running:
             try:
-                devices = self.db.get_all_devices()
+                devices = self.tracker.get_all_devices()
                 
                 for mac, ip, hostname, current_status in devices:
                     is_online = self.pinger.is_online(ip)
                     new_status = 'online' if is_online else 'offline'
                     
                     if new_status != current_status:
-                        self.db.update_device_status(mac, new_status)
+                        self.tracker.update_device_status(mac, new_status)
                 
                 time.sleep(self.config['polling_interval_seconds'])
             
@@ -485,5 +423,3 @@ class NetworkMonitor:
 if __name__ == '__main__':
     monitor = NetworkMonitor()
     monitor.start()
-    
-
