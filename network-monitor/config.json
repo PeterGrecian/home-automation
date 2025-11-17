@@ -1,5 +1,13 @@
 {
-  "subnet": "192.168.4.0/22",
-  "discovery_interval_seconds": 600,
-  "polling_interval_seconds": 60
+  "subnet": "192.168.4.0/24",
+  "interface": "eth0",
+  "discovery_interval_seconds": 30,
+  "polling_interval_seconds": 3,
+  "scanner": "arp-scan",
+  "prepopulate_arp": true,
+  "devices_dir": "devices",
+  "log_file": "monitor.log",
+  "log_level": "INFO",
+  "common_vendors": {
+  }
 }
