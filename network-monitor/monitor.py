@@ -142,6 +142,11 @@ class DeviceTracker:
         """Get safe filename for device"""
         # Remove any unsafe characters
         safe_name = ''.join(c for c in hostname if c.isalnum() or c in '-_')
+        # Strip leading hyphens/underscores to avoid bash command issues
+        safe_name = safe_name.lstrip('-_')
+        # Fallback if name is empty after sanitization
+        if not safe_name:
+            safe_name = 'unknown-device'
         return safe_name
     
     def add_or_update_device(self, mac: str, ip: str, hostname: str):
