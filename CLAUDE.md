@@ -60,8 +60,15 @@ Key settings:
 - `polling_interval_seconds`: How often to ping known devices (default: 3s)
 - `ping_count`: Number of ping packets to send per check (default: 3)
 - `ping_timeout_seconds`: Maximum time to wait for ping response (default: 3s)
+- `parallel_ping_workers`: Number of concurrent threads for polling devices (default: 10)
 
 **Ping behavior:** A device is marked **online** if ANY ping packet succeeds, and **offline** only if ALL packets fail. Using `ping_count: 3` reduces false positives from transient packet loss compared to single-ping checks.
+
+**Parallel polling and timestamp precision:**
+- **Sequential polling** (workers=1): With 20 devices and 3s timeout, a polling cycle takes ~60 seconds. State change timestamps have poor precision - the actual state change could have occurred anywhere within the 60-second cycle.
+- **Parallel polling** (workers=10+): All devices checked nearly simultaneously in ~3 seconds. Much better timestamp precision for when state changes actually occurred.
+- **System limits**: Each ping opens a network socket. Maximum concurrent sockets limited by OS file descriptor limits. Check with `ulimit -n` (typical default: 1024). Set `parallel_ping_workers` well below this limit. Recommended: 10-20 for home networks.
+- **Trade-offs**: More workers = faster cycles and better precision, but higher CPU/network burst usage.
 
 ### Google Home Automations (YAML files)
 
