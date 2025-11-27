@@ -36,7 +36,6 @@ def test_config_loading():
             "scanner": "arp-scan",
             "prepopulate_arp": True,
             "devices_dir": "test_devices",
-            "log_file": "test.log",
             "log_level": "INFO",
             "common_vendors": {}
         }
@@ -127,7 +126,6 @@ def test_network_monitor_initialization():
             "scanner": "arp-scan",
             "prepopulate_arp": True,
             "devices_dir": "test_devices_nm",
-            "log_file": "test.log",
             "log_level": "INFO",
             "common_vendors": {}
         }

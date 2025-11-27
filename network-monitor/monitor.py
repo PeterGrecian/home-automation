@@ -16,15 +16,7 @@ import logging
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(threadName)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('monitor.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
+# Logger will be configured after loading config
 logger = logging.getLogger(__name__)
 
 
@@ -342,13 +334,35 @@ class NetworkMonitor:
         with open(config_path, 'r') as f:
             self.config = json.load(f)
 
-        self.tracker = DeviceTracker()
+        # Setup logging with optional file output
+        self._setup_logging()
+
+        self.tracker = DeviceTracker(devices_dir=self.config.get('devices_dir', 'devices'))
         self.scanner = NetworkScanner(self.config['subnet'])
         self.pinger = DevicePinger(
             timeout_seconds=self.config.get('ping_timeout_seconds', 2),
             ping_count=self.config.get('ping_count', 1)
         )
         self.running = False
+
+    def _setup_logging(self):
+        """Configure logging based on config (file logging is optional)"""
+        log_level = getattr(logging, self.config.get('log_level', 'INFO').upper())
+        log_format = '%(asctime)s - %(threadName)s - %(levelname)s - %(message)s'
+
+        handlers = [logging.StreamHandler(sys.stdout)]
+
+        # Only add file handler if log_file is specified
+        log_file = self.config.get('log_file')
+        if log_file:
+            handlers.append(logging.FileHandler(log_file))
+
+        logging.basicConfig(
+            level=log_level,
+            format=log_format,
+            handlers=handlers,
+            force=True  # Override any existing config
+        )
     
     def discovery_thread(self):
         """Thread for periodic network discovery"""

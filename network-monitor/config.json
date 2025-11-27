@@ -58,11 +58,8 @@
   "_devices_dir_info": "Directory path (relative to monitor.py) where device state files are stored. Each monitored device gets its own CSV file named by MAC address (with colons removed). Files contain timestamp,ip,mac,status,interval_seconds on each line. This directory must be writable by the user running monitor.py. Do NOT run monitor.py with sudo or files will be owned by root.",
 
   "_logging_settings": {
-    "_description": "Application logging configuration controlling where logs are written and how verbose they should be"
+    "_description": "Application logging configuration. Logs always go to stdout (captured by systemd journal when run as service). File logging is optional and intended for testing/debugging only."
   },
-  "log_file": "monitor.log",
-  "_log_file_info": "Path to the application log file (relative to monitor.py). Logs are written to both this file and stdout. File is appended to, not overwritten. Use 'tail -f monitor.log' to watch logs in real-time. Rotates automatically when it gets large.",
-
   "log_level": "INFO",
   "_log_level_info": "Logging verbosity level. Options (from least to most verbose): 'ERROR', 'WARNING', 'INFO', 'DEBUG'. 'INFO' shows all state changes and important events. 'DEBUG' shows detailed scanning operations and is useful for troubleshooting. 'WARNING' only shows problems. Default: INFO",
 
