@@ -17,20 +17,29 @@ This is a home automation project for managing Google Home devices and network m
 Run **without sudo** (sudo is already embedded in the code for arp-scan calls):
 
 ```bash
-# Run manually
+# Run manually (logs to stdout)
 python3 network-monitor/monitor.py
 
-# View logs in real-time
-tail -f monitor.log
+# Run with custom config (useful for testing)
+python3 network-monitor/monitor.py --config test-config.json
 
 # Run as systemd service (auto-start on boot)
 sudo cp network-monitor/network-monitor.service /etc/systemd/system/
 sudo systemctl enable network-monitor.service
 sudo systemctl start network-monitor.service
 sudo systemctl status network-monitor.service
+
+# View service logs
+journalctl -u network-monitor -f
 ```
 
 **Important:** Do not run with sudo or device files will be owned by root.
+
+**Logging:**
+- Default: Logs to stdout only (captured by systemd journal when running as service)
+- Optional: Add `"log_file": "filename.log"` to config.json for file-based logging (testing/debugging only)
+- View service logs: `journalctl -u network-monitor -f`
+- View file logs: `tail -f filename.log`
 
 ### Proximity Detection
 
