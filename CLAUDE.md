@@ -49,6 +49,10 @@ Key settings:
 - `interface`: Network interface (eth0 or wlan0)
 - `discovery_interval_seconds`: How often to scan entire network (default: 30s)
 - `polling_interval_seconds`: How often to ping known devices (default: 3s)
+- `ping_count`: Number of ping packets to send per check (default: 3)
+- `ping_timeout_seconds`: Maximum time to wait for ping response (default: 3s)
+
+**Ping behavior:** A device is marked **online** if ANY ping packet succeeds, and **offline** only if ALL packets fail. Using `ping_count: 3` reduces false positives from transient packet loss compared to single-ping checks.
 
 ### Google Home Automations (YAML files)
 
@@ -87,7 +91,7 @@ These are meant to be imported into Google Home at: https://home.google.com/home
 - `NetworkScanner`: Handles device discovery via arp-scan/nmap
 - `DeviceTracker`: Thread-safe file-based device state management
   - `_get_filename()` strips leading hyphens/underscores to prevent bash command issues
-- `DevicePinger`: Fast ping-based connectivity checks
+- `DevicePinger`: Configurable ping-based connectivity checks (timeout and count from config.json)
 - `MacVendorLookup`: MAC OUI → manufacturer mapping with API fallback
 
 **Network Interface:**
