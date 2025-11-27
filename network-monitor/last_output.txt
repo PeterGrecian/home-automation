@@ -1,0 +1,17 @@
+Nmap scan report for 192.168.4.1
+Nmap scan report for 192.168.4.20
+Nmap scan report for 192.168.4.21
+Nmap scan report for 192.168.4.22
+Nmap scan report for 192.168.4.25
+Nmap scan report for 192.168.4.27
+Nmap scan report for 192.168.4.29
+Nmap scan report for 192.168.4.32
+Nmap scan report for 192.168.4.36
+Nmap scan report for 192.168.4.45
+Nmap scan report for 192.168.4.47
+Nmap scan report for 192.168.4.49
+Nmap scan report for 192.168.4.69
+Nmap scan report for 192.168.4.70
+Nmap scan report for 192.168.4.71
+Nmap scan report for 192.168.4.102
+Nmap scan report for 192.168.4.106

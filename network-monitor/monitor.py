@@ -395,17 +395,25 @@ class NetworkMonitor:
                 logger.error(f"Discovery error: {e}")
                 time.sleep(60)
     
-    def _check_device(self, device_info):
+    def _check_device(self, device_info, stagger_delay=0.0):
         """Check a single device (for parallel execution)"""
+        # Stagger start time to spread network/CPU load
+        if stagger_delay > 0:
+            time.sleep(stagger_delay)
+
         mac, ip, hostname, current_status = device_info
         is_online = self.pinger.is_online(ip)
         new_status = 'online' if is_online else 'offline'
         return (mac, new_status, current_status)
 
     def polling_thread(self):
-        """Thread for fast polling of known devices (parallel)"""
+        """Thread for fast polling of known devices (parallel with staggered start)"""
         max_workers = self.config.get('parallel_ping_workers', 10)
-        logger.info(f"Polling thread started (interval: {self.config['polling_interval_seconds']}s, workers: {max_workers})")
+        stagger_ms = self.config.get('parallel_stagger_ms', 50)
+        stagger_delay = stagger_ms / 1000.0  # Convert to seconds
+
+        logger.info(f"Polling thread started (interval: {self.config['polling_interval_seconds']}s, "
+                   f"workers: {max_workers}, stagger: {stagger_ms}ms)")
 
         while self.running:
             try:
@@ -415,13 +423,14 @@ class NetworkMonitor:
                     time.sleep(self.config['polling_interval_seconds'])
                     continue
 
-                # Ping all devices in parallel
+                # Ping all devices in parallel with staggered start
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    # Submit all ping tasks
-                    future_to_device = {
-                        executor.submit(self._check_device, device): device
-                        for device in devices
-                    }
+                    # Submit all ping tasks with incremental stagger delays
+                    future_to_device = {}
+                    for i, device in enumerate(devices):
+                        delay = i * stagger_delay
+                        future = executor.submit(self._check_device, device, delay)
+                        future_to_device[future] = device
 
                     # Process results as they complete
                     for future in as_completed(future_to_device):

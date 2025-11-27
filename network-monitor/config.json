@@ -42,6 +42,9 @@
   "parallel_ping_workers": 10,
   "_parallel_ping_workers_info": "Number of parallel threads to use for pinging devices. With parallel polling, all devices are checked simultaneously instead of sequentially. Higher values = faster polling cycles but more CPU/network usage. Value of 10-20 is typical for home networks. Default: 10",
 
+  "parallel_stagger_ms": 50,
+  "_parallel_stagger_ms_info": "Milliseconds to stagger the start of each ping thread. With 15 devices and 50ms stagger, threads start at 0ms, 50ms, 100ms, etc., spreading the network/CPU load over 750ms instead of all at once. Lower values = tighter grouping but higher burst load. Higher values = smoother load distribution. Recommended: 20-100ms. Default: 50",
+
   "_scanner_settings": {
     "_description": "Settings that control which network scanning tool is used for device discovery and how the ARP cache is managed"
   },

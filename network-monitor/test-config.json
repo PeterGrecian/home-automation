@@ -1,0 +1,25 @@
+{
+  "_documentation": {
+    "_purpose": "TEST configuration for parallel polling branch",
+    "_description": "Separate config to test parallel polling without disrupting production monitor"
+  },
+
+  "subnet": "192.168.4.0/24",
+  "interface": "eth0",
+  "discovery_interval_seconds": 60,
+  "polling_interval_seconds": 5,
+
+  "ping_timeout_seconds": 3,
+  "ping_count": 3,
+  "parallel_ping_workers": 3,
+  "parallel_stagger_ms": 100,
+
+  "scanner": "arp-scan",
+  "prepopulate_arp": true,
+
+  "devices_dir": "test-devices",
+  "log_file": "test-monitor.log",
+  "log_level": "INFO",
+
+  "common_vendors": {}
+}
