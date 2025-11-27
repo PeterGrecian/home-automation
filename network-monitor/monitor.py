@@ -456,5 +456,12 @@ class NetworkMonitor:
 
 
 if __name__ == '__main__':
-    monitor = NetworkMonitor()
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Network Device Monitor')
+    parser.add_argument('--config', default='config.json',
+                       help='Path to configuration file (default: config.json)')
+    args = parser.parse_args()
+
+    monitor = NetworkMonitor(config_path=args.config)
     monitor.start()
