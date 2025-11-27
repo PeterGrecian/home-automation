@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Dict, Optional
 import logging
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Setup logging
 logging.basicConfig(
@@ -380,23 +381,46 @@ class NetworkMonitor:
                 logger.error(f"Discovery error: {e}")
                 time.sleep(60)
     
+    def _check_device(self, device_info):
+        """Check a single device (for parallel execution)"""
+        mac, ip, hostname, current_status = device_info
+        is_online = self.pinger.is_online(ip)
+        new_status = 'online' if is_online else 'offline'
+        return (mac, new_status, current_status)
+
     def polling_thread(self):
-        """Thread for fast polling of known devices"""
-        logger.info(f"Polling thread started (interval: {self.config['polling_interval_seconds']}s)")
-        
+        """Thread for fast polling of known devices (parallel)"""
+        max_workers = self.config.get('parallel_ping_workers', 10)
+        logger.info(f"Polling thread started (interval: {self.config['polling_interval_seconds']}s, workers: {max_workers})")
+
         while self.running:
             try:
                 devices = self.tracker.get_all_devices()
-                
-                for mac, ip, hostname, current_status in devices:
-                    is_online = self.pinger.is_online(ip)
-                    new_status = 'online' if is_online else 'offline'
-                    
-                    if new_status != current_status:
-                        self.tracker.update_device_status(mac, new_status)
-                
+
+                if not devices:
+                    time.sleep(self.config['polling_interval_seconds'])
+                    continue
+
+                # Ping all devices in parallel
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    # Submit all ping tasks
+                    future_to_device = {
+                        executor.submit(self._check_device, device): device
+                        for device in devices
+                    }
+
+                    # Process results as they complete
+                    for future in as_completed(future_to_device):
+                        try:
+                            mac, new_status, current_status = future.result()
+                            if new_status != current_status:
+                                self.tracker.update_device_status(mac, new_status)
+                        except Exception as e:
+                            device = future_to_device[future]
+                            logger.error(f"Error checking device {device[2]}: {e}")
+
                 time.sleep(self.config['polling_interval_seconds'])
-            
+
             except Exception as e:
                 logger.error(f"Polling error: {e}")
                 time.sleep(30)
