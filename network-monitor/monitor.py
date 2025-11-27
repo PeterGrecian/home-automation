@@ -316,15 +316,18 @@ class NetworkScanner:
 
 class DevicePinger:
     """Fast ping checking for known devices"""
-    
-    @staticmethod
-    def is_online(ip: str) -> bool:
+
+    def __init__(self, timeout_seconds: int = 2, ping_count: int = 1):
+        self.timeout_seconds = timeout_seconds
+        self.ping_count = ping_count
+
+    def is_online(self, ip: str) -> bool:
         """Quick ping check"""
         try:
             result = subprocess.run(
-                ['ping', '-c', '1', '-W', '1', ip],
+                ['ping', '-c', str(self.ping_count), '-W', str(self.timeout_seconds), ip],
                 capture_output=True,
-                timeout=2
+                timeout=self.timeout_seconds + 1
             )
             return result.returncode == 0
         except:
@@ -337,10 +340,13 @@ class NetworkMonitor:
     def __init__(self, config_path='config.json'):
         with open(config_path, 'r') as f:
             self.config = json.load(f)
-        
+
         self.tracker = DeviceTracker()
         self.scanner = NetworkScanner(self.config['subnet'])
-        self.pinger = DevicePinger()
+        self.pinger = DevicePinger(
+            timeout_seconds=self.config.get('ping_timeout_seconds', 2),
+            ping_count=self.config.get('ping_count', 1)
+        )
         self.running = False
     
     def discovery_thread(self):
