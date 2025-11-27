@@ -77,6 +77,10 @@ These are meant to be imported into Google Home at: https://home.google.com/home
 - One file per device in `devices/` directory
 - Format: `timestamp,ip,mac,status,interval_seconds`
 - Thread-safe with lock-based synchronization
+- **Automatic creation**: Both the `devices/` directory and individual device files are created automatically if missing
+- **Easy archiving**: Can move/delete entire `devices/` directory to archive old data - will be recreated on next run
+- **Human-readable**: CSV format allows direct inspection with `cat`, `grep`, or any text tools
+- **Resilient**: If one device file is corrupted, others are unaffected
 
 **Key Classes:**
 - `NetworkMonitor`: Main coordinator, manages threads
