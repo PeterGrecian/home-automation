@@ -67,8 +67,9 @@ Key settings:
 **Parallel polling and timestamp precision:**
 - **Sequential polling** (workers=1): With 20 devices and 3s timeout, a polling cycle takes ~60 seconds. State change timestamps have poor precision - the actual state change could have occurred anywhere within the 60-second cycle.
 - **Parallel polling** (workers=10+): All devices checked nearly simultaneously in ~3 seconds. Much better timestamp precision for when state changes actually occurred.
-- **System limits**: Each ping opens a network socket. Maximum concurrent sockets limited by OS file descriptor limits. Check with `ulimit -n` (typical default: 1024). Set `parallel_ping_workers` well below this limit. Recommended: 10-20 for home networks.
-- **Trade-offs**: More workers = faster cycles and better precision, but higher CPU/network burst usage.
+- **Auto-staggered start**: Ping threads automatically stagger their start times evenly across the polling interval (stagger = `polling_interval_seconds / number_of_devices`). For example, 20 devices with 3s interval = 150ms stagger. This spreads network/CPU load over time instead of bursting all at once. High-resolution timing (`time.sleep()` with fractional seconds) ensures precise staggering.
+- **System limits**: Each ping opens a network socket. Maximum concurrent sockets limited by OS file descriptor limits. Check with `ulimit -n` (typical default: 1024, this system: 524,288). On this Raspberry Pi, the socket limit is very high, allowing large-scale parallel polling if CPU capacity permits. Recommended: 10-20 for typical home networks, but can scale much higher if monitoring large networks.
+- **Trade-offs**: More workers = faster cycles and better precision, but higher CPU/network burst usage. Auto-staggering reduces burst intensity. The bottleneck is typically CPU, not socket limits.
 
 ### Google Home Automations (YAML files)
 

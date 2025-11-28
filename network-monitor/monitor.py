@@ -409,11 +409,9 @@ class NetworkMonitor:
     def polling_thread(self):
         """Thread for fast polling of known devices (parallel with staggered start)"""
         max_workers = self.config.get('parallel_ping_workers', 10)
-        stagger_ms = self.config.get('parallel_stagger_ms', 50)
-        stagger_delay = stagger_ms / 1000.0  # Convert to seconds
 
         logger.info(f"Polling thread started (interval: {self.config['polling_interval_seconds']}s, "
-                   f"workers: {max_workers}, stagger: {stagger_ms}ms)")
+                   f"workers: {max_workers})")
 
         while self.running:
             try:
@@ -422,6 +420,15 @@ class NetworkMonitor:
                 if not devices:
                     time.sleep(self.config['polling_interval_seconds'])
                     continue
+
+                # Calculate stagger delay to spread pings across polling interval
+                # stagger = interval / num_devices (in seconds)
+                num_devices = len(devices)
+                polling_interval = self.config['polling_interval_seconds']
+                stagger_delay = polling_interval / num_devices if num_devices > 0 else 0
+
+                stagger_ms = stagger_delay * 1000.0
+                logger.debug(f"Polling {num_devices} devices with {stagger_ms:.1f}ms stagger")
 
                 # Ping all devices in parallel with staggered start
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:

@@ -40,10 +40,7 @@
   "_ping_count_info": "Number of ping packets to send per check. Higher values = more reliable but slower. Value of 1 = fastest but may have false negatives. Value of 3-5 = good balance. Default: 3",
 
   "parallel_ping_workers": 10,
-  "_parallel_ping_workers_info": "Number of parallel threads to use for pinging devices. With parallel polling, all devices are checked simultaneously instead of sequentially. Higher values = faster polling cycles but more CPU/network usage. Value of 10-20 is typical for home networks. Default: 10",
-
-  "parallel_stagger_ms": 50,
-  "_parallel_stagger_ms_info": "Milliseconds to stagger the start of each ping thread. With 15 devices and 50ms stagger, threads start at 0ms, 50ms, 100ms, etc., spreading the network/CPU load over 750ms instead of all at once. Lower values = tighter grouping but higher burst load. Higher values = smoother load distribution. Recommended: 20-100ms. Default: 50",
+  "_parallel_ping_workers_info": "Number of parallel threads to use for pinging devices. With parallel polling, all devices are checked simultaneously instead of sequentially. Higher values = faster polling cycles but more CPU/network usage. The monitor automatically staggers ping starts evenly across the polling interval (stagger = polling_interval_seconds / number_of_devices) to spread network/CPU load. For example, 20 devices with 3s interval = 150ms stagger between pings. Value of 10-20 workers is typical for home networks. Default: 10",
 
   "_scanner_settings": {
     "_description": "Settings that control which network scanning tool is used for device discovery and how the ARP cache is managed"
