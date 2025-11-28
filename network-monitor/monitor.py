@@ -175,9 +175,17 @@ class DeviceTracker:
         with self.lock:
             if mac not in self.device_states:
                 return
-            
+
             device = self.device_states[mac]
             old_status = device['status']
+
+            # Ensure device file exists (safety check)
+            filename = self._get_filename(device['hostname'])
+            filepath = os.path.join(self.devices_dir, filename)
+            if not os.path.exists(filepath):
+                logger.warning(f"Device file missing for {device['hostname']}, creating empty file")
+                with open(filepath, 'w') as f:
+                    pass  # Create empty file
             
             # Only log if status actually changed
             if old_status != new_status:
