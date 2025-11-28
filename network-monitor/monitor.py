@@ -10,6 +10,7 @@ import time
 import subprocess
 import json
 import os
+import re
 from datetime import datetime
 from typing import Dict, Optional
 import logging
@@ -395,6 +396,33 @@ class NetworkMonitor:
                 logger.error(f"Discovery error: {e}")
                 time.sleep(60)
     
+    def _get_device_config(self, hostname: str) -> dict:
+        """Get config for a device, merging device_overrides if vendor pattern matches.
+
+        Args:
+            hostname: Device hostname (e.g., "EspressifInc-4DE4", "TuyaSmartInc-F412")
+
+        Returns:
+            Merged config dict with device-specific overrides applied
+        """
+        # Start with base config
+        device_config = {}
+
+        # Extract vendor from hostname (e.g., "EspressifInc-4DE4" -> "EspressifInc")
+        # Hostname format is typically "VendorName-MACADDR" or "VendorName-MACADDR-N"
+        vendor = hostname.rsplit('-', 1)[0] if '-' in hostname else hostname
+
+        # Check device_overrides for matching patterns
+        device_overrides = self.config.get('device_overrides', {})
+        for pattern, overrides in device_overrides.items():
+            if re.match(pattern, vendor):
+                # Pattern matches - merge these overrides
+                device_config.update(overrides)
+                logger.debug(f"Device {hostname} matched pattern '{pattern}', applying overrides: {overrides}")
+                break  # First match wins
+
+        return device_config
+
     def _check_device(self, device_info, stagger_delay=0.0):
         """Check a single device (for parallel execution)"""
         # Stagger start time to spread network/CPU load
@@ -402,7 +430,22 @@ class NetworkMonitor:
             time.sleep(stagger_delay)
 
         mac, ip, hostname, current_status = device_info
-        is_online = self.pinger.is_online(ip)
+
+        # Get device-specific config (merged with overrides)
+        device_config = self._get_device_config(hostname)
+
+        # Use device-specific ping settings if overridden, otherwise use default pinger
+        if device_config:
+            # Create device-specific pinger with merged config
+            pinger = DevicePinger(
+                timeout_seconds=device_config.get('ping_timeout_seconds', self.config.get('ping_timeout_seconds', 2)),
+                ping_count=device_config.get('ping_count', self.config.get('ping_count', 1))
+            )
+            is_online = pinger.is_online(ip)
+        else:
+            # No overrides, use default pinger
+            is_online = self.pinger.is_online(ip)
+
         new_status = 'online' if is_online else 'offline'
         return (mac, new_status, current_status)
 

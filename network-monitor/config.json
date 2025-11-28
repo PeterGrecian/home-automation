@@ -68,5 +68,24 @@
   },
   "common_vendors": {
     "_description": "Optional dictionary mapping MAC prefixes (first 6 hex digits) to vendor names for faster local lookup before querying external API. Example: '00:1A:2B': 'Apple Inc.'. This is a performance optimization to reduce API calls for common devices on your network. Leave empty to always use API lookup."
+  },
+
+  "_device_overrides_settings": {
+    "_description": "Per-device configuration overrides based on vendor name regex patterns. Allows customizing ping behavior, intervals, and other settings for specific device types. Patterns are matched against the vendor portion of device hostnames (e.g., 'EspressifInc' from 'EspressifInc-4DE4'). First matching pattern wins."
+  },
+  "device_overrides": {
+    "_description": "Dictionary of regex patterns to config overrides. Only specify values that differ from defaults (kustomize-style overlay). Any config parameter can be overridden. Examples below show common use cases.",
+    "_example_espressif": "Pattern 'Espressif.*' matches devices like 'EspressifInc-4DE4'. ESP devices often have flaky Wi-Fi, so increase ping count/timeout for reliability.",
+    "_example_tuya": "Pattern 'Tuya.*' matches devices like 'TuyaSmartInc-F412'. IoT devices may sleep to save power, so reduce polling frequency to avoid battery drain.",
+    "_usage": "Uncomment and customize the examples below, or add your own patterns:",
+    "_Espressif.*": {
+      "_ping_count": 5,
+      "_ping_timeout_seconds": 5,
+      "__comment": "Espressif ESP devices (ESP8266, ESP32) often have unreliable Wi-Fi. More pings = fewer false offline detections."
+    },
+    "_Tuya.*": {
+      "_polling_interval_seconds": 60,
+      "__comment": "Tuya smart home devices may sleep between operations. Poll less frequently to reduce wake-ups and save battery."
+    }
   }
 }

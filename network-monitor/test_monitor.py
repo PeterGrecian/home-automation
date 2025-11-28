@@ -152,5 +152,190 @@ def test_network_monitor_initialization():
             shutil.rmtree("test_devices_nm")
 
 
+def test_device_config_no_overrides():
+    """Test _get_device_config with no device_overrides configured"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        config = {
+            "subnet": "192.168.1.0/24",
+            "interface": "eth0",
+            "discovery_interval_seconds": 30,
+            "polling_interval_seconds": 3,
+            "ping_timeout_seconds": 2,
+            "ping_count": 3,
+            "parallel_ping_workers": 5,
+            "scanner": "arp-scan",
+            "prepopulate_arp": True,
+            "devices_dir": "test_devices_cfg1",
+            "log_level": "INFO",
+            "common_vendors": {}
+            # No device_overrides
+        }
+        json.dump(config, f)
+        config_path = f.name
+
+    try:
+        nm = monitor.NetworkMonitor(config_path=config_path)
+
+        # With no overrides, should return empty dict
+        device_config = nm._get_device_config("EspressifInc-4DE4")
+        assert device_config == {}
+
+        device_config = nm._get_device_config("TuyaSmartInc-F412")
+        assert device_config == {}
+
+    finally:
+        os.unlink(config_path)
+        if os.path.exists("test_devices_cfg1"):
+            import shutil
+            shutil.rmtree("test_devices_cfg1")
+
+
+def test_device_config_with_matching_pattern():
+    """Test _get_device_config with matching override patterns"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        config = {
+            "subnet": "192.168.1.0/24",
+            "interface": "eth0",
+            "discovery_interval_seconds": 30,
+            "polling_interval_seconds": 3,
+            "ping_timeout_seconds": 2,
+            "ping_count": 3,
+            "parallel_ping_workers": 5,
+            "scanner": "arp-scan",
+            "prepopulate_arp": True,
+            "devices_dir": "test_devices_cfg2",
+            "log_level": "INFO",
+            "common_vendors": {},
+            "device_overrides": {
+                "Espressif.*": {
+                    "ping_count": 5,
+                    "ping_timeout_seconds": 5
+                },
+                "Tuya.*": {
+                    "polling_interval_seconds": 60
+                }
+            }
+        }
+        json.dump(config, f)
+        config_path = f.name
+
+    try:
+        nm = monitor.NetworkMonitor(config_path=config_path)
+
+        # Test Espressif pattern match
+        device_config = nm._get_device_config("EspressifInc-4DE4")
+        assert device_config['ping_count'] == 5
+        assert device_config['ping_timeout_seconds'] == 5
+        assert 'polling_interval_seconds' not in device_config  # Only specified overrides
+
+        # Test Tuya pattern match
+        device_config = nm._get_device_config("TuyaSmartInc-F412")
+        assert device_config['polling_interval_seconds'] == 60
+        assert 'ping_count' not in device_config
+
+        # Test non-matching vendor
+        device_config = nm._get_device_config("GoogleInc-1234")
+        assert device_config == {}
+
+    finally:
+        os.unlink(config_path)
+        if os.path.exists("test_devices_cfg2"):
+            import shutil
+            shutil.rmtree("test_devices_cfg2")
+
+
+def test_device_config_vendor_extraction():
+    """Test that vendor is correctly extracted from hostname"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        config = {
+            "subnet": "192.168.1.0/24",
+            "interface": "eth0",
+            "discovery_interval_seconds": 30,
+            "polling_interval_seconds": 3,
+            "ping_timeout_seconds": 2,
+            "ping_count": 3,
+            "parallel_ping_workers": 5,
+            "scanner": "arp-scan",
+            "prepopulate_arp": True,
+            "devices_dir": "test_devices_cfg3",
+            "log_level": "INFO",
+            "common_vendors": {},
+            "device_overrides": {
+                "GoogleInc": {
+                    "ping_count": 2
+                }
+            }
+        }
+        json.dump(config, f)
+        config_path = f.name
+
+    try:
+        nm = monitor.NetworkMonitor(config_path=config_path)
+
+        # Test simple hostname (VendorName-MAC)
+        device_config = nm._get_device_config("GoogleInc-1234")
+        assert device_config['ping_count'] == 2
+
+        # Test hostname with duplicate suffix (VendorName-MAC-2)
+        device_config = nm._get_device_config("GoogleInc-1234-2")
+        assert device_config['ping_count'] == 2
+
+        # Test hostname with no hyphen
+        device_config = nm._get_device_config("GoogleInc")
+        assert device_config['ping_count'] == 2
+
+    finally:
+        os.unlink(config_path)
+        if os.path.exists("test_devices_cfg3"):
+            import shutil
+            shutil.rmtree("test_devices_cfg3")
+
+
+def test_device_config_first_match_wins():
+    """Test that first matching pattern wins when multiple patterns match"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        config = {
+            "subnet": "192.168.1.0/24",
+            "interface": "eth0",
+            "discovery_interval_seconds": 30,
+            "polling_interval_seconds": 3,
+            "ping_timeout_seconds": 2,
+            "ping_count": 3,
+            "parallel_ping_workers": 5,
+            "scanner": "arp-scan",
+            "prepopulate_arp": True,
+            "devices_dir": "test_devices_cfg4",
+            "log_level": "INFO",
+            "common_vendors": {},
+            "device_overrides": {
+                "Espressif.*": {
+                    "ping_count": 5
+                },
+                ".*": {  # Matches everything
+                    "ping_count": 10
+                }
+            }
+        }
+        json.dump(config, f)
+        config_path = f.name
+
+    try:
+        nm = monitor.NetworkMonitor(config_path=config_path)
+
+        # Espressif should match first pattern, not the .* wildcard
+        device_config = nm._get_device_config("EspressifInc-4DE4")
+        assert device_config['ping_count'] == 5  # Not 10
+
+        # Non-Espressif should match the .* wildcard
+        device_config = nm._get_device_config("GoogleInc-1234")
+        assert device_config['ping_count'] == 10
+
+    finally:
+        os.unlink(config_path)
+        if os.path.exists("test_devices_cfg4"):
+            import shutil
+            shutil.rmtree("test_devices_cfg4")
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

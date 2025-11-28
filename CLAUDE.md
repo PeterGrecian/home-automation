@@ -61,6 +61,7 @@ Key settings:
 - `ping_count`: Number of ping packets to send per check (default: 3)
 - `ping_timeout_seconds`: Maximum time to wait for ping response (default: 3s)
 - `parallel_ping_workers`: Number of concurrent threads for polling devices (default: 10)
+- `device_overrides`: Dict of regex patterns to per-device config overrides (optional)
 
 **Ping behavior:** A device is marked **online** if ANY ping packet succeeds, and **offline** only if ALL packets fail. Using `ping_count: 3` reduces false positives from transient packet loss compared to single-ping checks.
 
@@ -70,6 +71,29 @@ Key settings:
 - **Auto-staggered start**: Ping threads automatically stagger their start times evenly across the polling interval (stagger = `polling_interval_seconds / number_of_devices`). For example, 20 devices with 3s interval = 150ms stagger. This spreads network/CPU load over time instead of bursting all at once. High-resolution timing (`time.sleep()` with fractional seconds) ensures precise staggering.
 - **System limits**: Each ping opens a network socket. Maximum concurrent sockets limited by OS file descriptor limits. Check with `ulimit -n` (typical default: 1024, this system: 524,288). On this Raspberry Pi, the socket limit is very high, allowing large-scale parallel polling if CPU capacity permits. Recommended: 10-20 for typical home networks, but can scale much higher if monitoring large networks.
 - **Trade-offs**: More workers = faster cycles and better precision, but higher CPU/network burst usage. Auto-staggering reduces burst intensity. The bottleneck is typically CPU, not socket limits.
+
+**Device-specific configuration overrides:**
+- **Purpose**: Customize monitoring behavior for specific device types (e.g., increase ping reliability for flaky Wi-Fi chips, reduce polling frequency for battery-powered devices)
+- **Pattern matching**: Patterns are regex matched against the vendor portion of device hostnames (e.g., "EspressifInc" from "EspressifInc-4DE4")
+- **Overlay style**: Only specify values that differ from defaults (kustomize-style) - any config parameter can be overridden
+- **First match wins**: When multiple patterns match, the first one in the dict is used
+- **Example use cases**:
+  - **Espressif devices** (ESP8266/ESP32): Often have unreliable Wi-Fi → increase `ping_count` and `ping_timeout_seconds` to reduce false offline detections
+  - **Tuya IoT devices**: May sleep to save battery → increase `polling_interval_seconds` to reduce wake-ups
+  - **Critical devices**: Reduce `polling_interval_seconds` for faster offline detection
+- **Configuration example**:
+  ```json
+  "device_overrides": {
+    "Espressif.*": {
+      "ping_count": 5,
+      "ping_timeout_seconds": 5
+    },
+    "Tuya.*": {
+      "polling_interval_seconds": 60
+    }
+  }
+  ```
+- **Debug logging**: Set `log_level: "DEBUG"` to see which devices match patterns and what overrides are applied
 
 ### Google Home Automations (YAML files)
 
