@@ -337,5 +337,80 @@ def test_device_config_first_match_wins():
             shutil.rmtree("test_devices_cfg4")
 
 
+def test_disable_polling_override():
+    """Test that disable_polling override prevents device from being polled"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        config = {
+            "subnet": "192.168.1.0/24",
+            "interface": "eth0",
+            "discovery_interval_seconds": 30,
+            "polling_interval_seconds": 3,
+            "ping_timeout_seconds": 2,
+            "ping_count": 3,
+            "parallel_ping_workers": 5,
+            "scanner": "arp-scan",
+            "prepopulate_arp": True,
+            "devices_dir": "test_devices_cfg5",
+            "log_level": "INFO",
+            "common_vendors": {},
+            "device_overrides": {
+                "Google.*": {
+                    "disable_polling": True
+                }
+            }
+        }
+        json.dump(config, f)
+        config_path = f.name
+
+    try:
+        nm = monitor.NetworkMonitor(config_path=config_path)
+
+        # Google devices should have disable_polling=true
+        device_config = nm._get_device_config("GoogleInc-1234")
+        assert device_config.get('disable_polling') == True
+
+        # Non-Google devices should not have disable_polling set
+        device_config = nm._get_device_config("EspressifInc-4DE4")
+        assert device_config.get('disable_polling', False) == False
+
+    finally:
+        os.unlink(config_path)
+        if os.path.exists("test_devices_cfg5"):
+            import shutil
+            shutil.rmtree("test_devices_cfg5")
+
+
+def test_discovery_trigger_file_config():
+    """Test that discovery_trigger_file config option is recognized"""
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        config = {
+            "subnet": "192.168.1.0/24",
+            "interface": "eth0",
+            "discovery_interval_seconds": 30,
+            "polling_interval_seconds": 3,
+            "ping_timeout_seconds": 2,
+            "ping_count": 3,
+            "parallel_ping_workers": 5,
+            "scanner": "arp-scan",
+            "prepopulate_arp": True,
+            "devices_dir": "test_devices_cfg6",
+            "log_level": "INFO",
+            "common_vendors": {},
+            "discovery_trigger_file": "trigger-discovery"
+        }
+        json.dump(config, f)
+        config_path = f.name
+
+    try:
+        nm = monitor.NetworkMonitor(config_path=config_path)
+        assert nm.config.get('discovery_trigger_file') == "trigger-discovery"
+
+    finally:
+        os.unlink(config_path)
+        if os.path.exists("test_devices_cfg6"):
+            import shutil
+            shutil.rmtree("test_devices_cfg6")
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

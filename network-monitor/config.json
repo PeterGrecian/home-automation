@@ -27,6 +27,9 @@
   "discovery_interval_seconds": 30,
   "_discovery_interval_info": "Pause time (in seconds) between discovery scans. NOTE: This is the sleep time AFTER each scan completes, not the total interval. The actual time between scan starts = run time + this pause. Estimated run time: 5-30 seconds for typical home networks (depends on network size and response times). A /24 subnet with arp-scan typically takes 5-15 seconds, plus up to 60 seconds for fping ARP cache pre-population if enabled. Total cycle time example: 15s scan + 30s pause = 45s between scan starts. Recommended pause: 30-300 seconds. Lower values detect new devices faster but increase network/CPU usage. Default: 30",
 
+  "_discovery_trigger_file": "trigger-discovery",
+  "_discovery_trigger_file_info": "Optional file path to trigger on-demand discovery scans. When this file exists, the monitor immediately runs a discovery scan and deletes the file. Useful for running discovery manually without restarting the service. Example: Set discovery_interval_seconds to 86400 (1 day) for infrequent automatic scans, then 'touch trigger-discovery' to scan on-demand. The monitor checks for this file every 5 seconds during sleep. Uncomment to enable.",
+
   "polling_interval_seconds": 3,
   "_polling_interval_info": "Pause time (in seconds) between polling cycles. NOTE: This is the sleep time AFTER each polling round completes, not the total interval. The actual time between polling starts = run time + this pause. Estimated run time: (number_of_devices × ping_timeout_seconds). For example, 20 devices with 3-second ping timeout = ~60 seconds of pinging (done sequentially), plus this 3-second pause = 63s total cycle. For faster state change detection, reduce ping_timeout_seconds rather than this value. Recommended pause: 1-10 seconds. Default: 3",
 
@@ -77,6 +80,7 @@
     "_description": "Dictionary of regex patterns to config overrides. Only specify values that differ from defaults (kustomize-style overlay). Any config parameter can be overridden. Examples below show common use cases.",
     "_example_espressif": "Pattern 'Espressif.*' matches devices like 'EspressifInc-4DE4'. ESP devices often have flaky Wi-Fi, so increase ping count/timeout for reliability.",
     "_example_tuya": "Pattern 'Tuya.*' matches devices like 'TuyaSmartInc-F412'. IoT devices may sleep to save power, so reduce polling frequency to avoid battery drain.",
+    "_example_disable_polling": "Pattern 'Google.*' with disable_polling=true means Google devices are discovered but not continuously polled. Useful for uninteresting devices.",
     "_usage": "Uncomment and customize the examples below, or add your own patterns:",
     "_Espressif.*": {
       "_ping_count": 5,
@@ -86,6 +90,10 @@
     "_Tuya.*": {
       "_polling_interval_seconds": 60,
       "__comment": "Tuya smart home devices may sleep between operations. Poll less frequently to reduce wake-ups and save battery."
+    },
+    "_Google.*": {
+      "_disable_polling": true,
+      "__comment": "Google devices will be discovered but not continuously polled. Saves resources for devices you don't care to monitor closely."
     }
   }
 }

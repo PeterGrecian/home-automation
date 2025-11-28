@@ -57,6 +57,7 @@ Key settings:
 - `subnet`: Network range to scan (default: 192.168.4.0/24)
 - `interface`: Network interface (eth0 or wlan0)
 - `discovery_interval_seconds`: How often to scan entire network (default: 30s)
+- `discovery_trigger_file`: Optional file path to trigger on-demand discovery scans (e.g., "trigger-discovery")
 - `polling_interval_seconds`: How often to ping known devices (default: 3s)
 - `ping_count`: Number of ping packets to send per check (default: 3)
 - `ping_timeout_seconds`: Maximum time to wait for ping response (default: 3s)
@@ -64,6 +65,14 @@ Key settings:
 - `device_overrides`: Dict of regex patterns to per-device config overrides (optional)
 
 **Ping behavior:** A device is marked **online** if ANY ping packet succeeds, and **offline** only if ALL packets fail. Using `ping_count: 3` reduces false positives from transient packet loss compared to single-ping checks.
+
+**On-demand discovery trigger:**
+- Configure `discovery_trigger_file` (e.g., "trigger-discovery") to enable manual discovery scans
+- Touch the file to trigger: `touch trigger-discovery`
+- Monitor automatically deletes the file after triggering
+- Checked every 5 seconds during sleep, typical response time: 0-5 seconds
+- Use case: Set `discovery_interval_seconds: 86400` (1 day) for infrequent automatic scans, trigger manually when needed
+- Useful for primarily monitoring known devices (switches) with rare discovery needs
 
 **Parallel polling and timestamp precision:**
 - **Sequential polling** (workers=1): With 20 devices and 3s timeout, a polling cycle takes ~60 seconds. State change timestamps have poor precision - the actual state change could have occurred anywhere within the 60-second cycle.
@@ -81,6 +90,7 @@ Key settings:
   - **Espressif devices** (ESP8266/ESP32): Often have unreliable Wi-Fi → increase `ping_count` and `ping_timeout_seconds` to reduce false offline detections
   - **Tuya IoT devices**: May sleep to save battery → increase `polling_interval_seconds` to reduce wake-ups
   - **Critical devices**: Reduce `polling_interval_seconds` for faster offline detection
+  - **Uninteresting devices**: Set `disable_polling: true` to discover but not continuously poll (saves CPU/network for devices you don't care about)
 - **Configuration example**:
   ```json
   "device_overrides": {
@@ -90,6 +100,9 @@ Key settings:
     },
     "Tuya.*": {
       "polling_interval_seconds": 60
+    },
+    "Google.*": {
+      "disable_polling": true
     }
   }
   ```

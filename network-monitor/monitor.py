@@ -368,7 +368,12 @@ class NetworkMonitor:
     def discovery_thread(self):
         """Thread for periodic network discovery"""
         logger.info(f"Discovery thread started (interval: {self.config['discovery_interval_seconds']}s)")
-        
+
+        # Get trigger file path if configured
+        trigger_file = self.config.get('discovery_trigger_file')
+        if trigger_file:
+            logger.info(f"Discovery trigger file: {trigger_file} (touch this file to trigger immediate scan)")
+
         while self.running:
             try:
                 # Pre-populate ARP cache to ensure all devices are visible
@@ -381,17 +386,35 @@ class NetworkMonitor:
                     )
                 except (subprocess.TimeoutExpired, FileNotFoundError):
                     logger.warning("fping not available, skipping ARP cache pre-population")
-                
+
                 logger.info(f"Starting network scan of {self.config['subnet']}")
                 devices = self.scanner.scan()
                 logger.info(f"Scan complete: found {len(devices)} devices")
-                
+
                 for mac, (ip, hostname) in devices.items():
                     self.tracker.add_or_update_device(mac, ip, hostname)
                     self.tracker.update_device_status(mac, 'online')
-                
-                time.sleep(self.config['discovery_interval_seconds'])
-            
+
+                # Sleep with periodic trigger file checks for responsiveness
+                interval = self.config['discovery_interval_seconds']
+                sleep_chunk = 5  # Check for trigger every 5 seconds
+                elapsed = 0
+
+                while elapsed < interval and self.running:
+                    # Check for trigger file
+                    if trigger_file and os.path.exists(trigger_file):
+                        logger.info(f"Discovery trigger file detected ({trigger_file}), running immediate scan")
+                        try:
+                            os.remove(trigger_file)
+                        except OSError as e:
+                            logger.warning(f"Could not remove trigger file: {e}")
+                        break  # Exit sleep loop to run discovery immediately
+
+                    # Sleep in small chunks for responsiveness
+                    sleep_time = min(sleep_chunk, interval - elapsed)
+                    time.sleep(sleep_time)
+                    elapsed += sleep_time
+
             except Exception as e:
                 logger.error(f"Discovery error: {e}")
                 time.sleep(60)
@@ -464,20 +487,35 @@ class NetworkMonitor:
                     time.sleep(self.config['polling_interval_seconds'])
                     continue
 
+                # Filter out devices with disable_polling=true
+                devices_to_poll = []
+                for device in devices:
+                    mac, ip, hostname, current_status = device
+                    device_config = self._get_device_config(hostname)
+                    if not device_config.get('disable_polling', False):
+                        devices_to_poll.append(device)
+                    else:
+                        logger.debug(f"Skipping polling for {hostname} (disable_polling=true)")
+
+                if not devices_to_poll:
+                    logger.debug(f"No devices to poll (all {len(devices)} devices have disable_polling=true)")
+                    time.sleep(self.config['polling_interval_seconds'])
+                    continue
+
                 # Calculate stagger delay to spread pings across polling interval
                 # stagger = interval / num_devices (in seconds)
-                num_devices = len(devices)
+                num_devices = len(devices_to_poll)
                 polling_interval = self.config['polling_interval_seconds']
                 stagger_delay = polling_interval / num_devices if num_devices > 0 else 0
 
                 stagger_ms = stagger_delay * 1000.0
-                logger.debug(f"Polling {num_devices} devices with {stagger_ms:.1f}ms stagger")
+                logger.debug(f"Polling {num_devices} devices with {stagger_ms:.1f}ms stagger ({len(devices) - num_devices} skipped)")
 
                 # Ping all devices in parallel with staggered start
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     # Submit all ping tasks with incremental stagger delays
                     future_to_device = {}
-                    for i, device in enumerate(devices):
+                    for i, device in enumerate(devices_to_poll):
                         delay = i * stagger_delay
                         future = executor.submit(self._check_device, device, delay)
                         future_to_device[future] = device
