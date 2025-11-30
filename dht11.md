@@ -39,9 +39,25 @@ GND (-)      -> Pin 6 (Ground) or any GND pin
 
 ## Installation
 
-### Quick Install (Recommended)
+### Recommended for 32-bit Raspberry Pi (pigpio version)
 
-Run the automated installation script:
+If you have a 32-bit Raspberry Pi (like Raspberry Pi 2) or are experiencing library compatibility issues:
+
+```bash
+./install-dht11-pigpio.sh
+```
+
+Then use the pigpio version of the reader:
+
+```bash
+python3 dht11_reader_pigpio.py
+```
+
+**Why pigpio?** The Adafruit library has binary compatibility issues on 32-bit ARM systems. The pigpio library is pure Python with C daemon and works reliably on all Raspberry Pi models.
+
+### Standard Installation (64-bit systems)
+
+For 64-bit Raspberry Pi systems, run the automated installation script:
 
 ```bash
 ./install-dht11.sh
