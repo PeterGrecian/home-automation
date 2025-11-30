@@ -63,8 +63,14 @@ sudo apt-get install -y python3-pip libgpiod3
 **2. Install Python Library**
 
 ```bash
-pip3 install adafruit-circuitpython-dht
+# Try system package first (recommended)
+sudo apt-get install -y python3-adafruit-circuitpython-dht
+
+# If system package unavailable, use pip (newer Raspberry Pi OS)
+pip3 install --break-system-packages adafruit-circuitpython-dht
 ```
+
+**Note:** Newer Raspberry Pi OS versions require `--break-system-packages` flag due to PEP 668 externally-managed-environment protection. This is safe on a dedicated automation device.
 
 **3. Verify Installation**
 

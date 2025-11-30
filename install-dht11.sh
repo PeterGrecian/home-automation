@@ -31,7 +31,25 @@ sudo apt-get install -y python3-pip libgpiod3
 
 echo ""
 echo "Step 3: Installing Adafruit DHT Python library..."
-pip3 install adafruit-circuitpython-dht
+
+# Try system package first
+if sudo apt-get install -y python3-adafruit-circuitpython-dht 2>/dev/null; then
+    echo "✓ Installed from system package"
+else
+    echo "System package not available, using pip..."
+    # Use --break-system-packages for Raspberry Pi (dedicated device)
+    # This is safe on a dedicated automation device
+    if pip3 install --break-system-packages adafruit-circuitpython-dht 2>/dev/null; then
+        echo "✓ Installed via pip with --break-system-packages"
+    else
+        echo "✗ Failed to install DHT library"
+        echo ""
+        echo "Manual installation required:"
+        echo "  pip3 install --break-system-packages adafruit-circuitpython-dht"
+        echo "or create a virtual environment"
+        exit 1
+    fi
+fi
 
 echo ""
 echo "Step 4: Verifying installation..."
