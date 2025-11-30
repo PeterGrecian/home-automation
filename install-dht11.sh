@@ -33,17 +33,25 @@ echo ""
 echo "Step 2a: Creating libgpiod compatibility symlink..."
 # Adafruit library expects libgpiod.so.2, but newer systems have libgpiod.so.3
 # Create symlink for backward compatibility
+SYMLINK_CREATED=false
 if [ -f /usr/lib/aarch64-linux-gnu/libgpiod.so.3 ] && [ ! -f /usr/lib/aarch64-linux-gnu/libgpiod.so.2 ]; then
     sudo ln -s /usr/lib/aarch64-linux-gnu/libgpiod.so.3 /usr/lib/aarch64-linux-gnu/libgpiod.so.2
     echo "✓ Created libgpiod.so.2 -> libgpiod.so.3 symlink"
+    SYMLINK_CREATED=true
 elif [ -f /usr/lib/arm-linux-gnueabihf/libgpiod.so.3 ] && [ ! -f /usr/lib/arm-linux-gnueabihf/libgpiod.so.2 ]; then
     sudo ln -s /usr/lib/arm-linux-gnueabihf/libgpiod.so.3 /usr/lib/arm-linux-gnueabihf/libgpiod.so.2
     echo "✓ Created libgpiod.so.2 -> libgpiod.so.3 symlink"
+    SYMLINK_CREATED=true
 elif [ -f /usr/lib/aarch64-linux-gnu/libgpiod.so.2 ] || [ -f /usr/lib/arm-linux-gnueabihf/libgpiod.so.2 ]; then
     echo "✓ libgpiod.so.2 already exists"
 else
     echo "⚠ Could not find libgpiod library - may cause issues"
 fi
+
+# Update dynamic linker cache so libraries are found
+echo "Updating library cache..."
+sudo ldconfig
+echo "✓ Library cache updated"
 
 echo ""
 echo "Step 3: Installing Adafruit DHT Python library..."
