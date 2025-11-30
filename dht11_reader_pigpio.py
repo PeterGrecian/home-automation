@@ -24,15 +24,15 @@ class DHT11Reader:
         self.bit = 40
         self.either_edge_cb = None
 
-    def _decode_dht11(self, edge, tick):
+    def _decode_dht11(self, gpio, level, tick):
         """Decode DHT11 data bits"""
-        if edge == 0:  # Falling edge
+        if level == 0:  # Falling edge
             self.bit += 1
             if self.bit >= 40:
                 self.bit = -2
                 self.pi.set_watchdog(self.gpio, 0)
 
-        elif edge == 1:  # Rising edge
+        elif level == 1:  # Rising edge
             diff = pigpio.tickDiff(self.high_tick, tick)
             self.high_tick = tick
 
