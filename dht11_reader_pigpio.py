@@ -9,7 +9,7 @@ import time
 import pigpio
 
 # GPIO pin for DHT11 data line
-DHT11_PIN = 3
+DHT11_PIN = 4  # Physical pin 7
 
 class DHT11Reader:
     """
@@ -98,7 +98,7 @@ class DHT11Reader:
 def main():
     """Main loop - continuously read sensor data"""
     print("DHT11 Sensor Reader (pigpio version)")
-    print("Reading from GPIO pin 3")
+    print("Reading from GPIO pin 4 (physical pin 7)")
     print("Press Ctrl+C to exit\n")
 
     # Connect to pigpio daemon
