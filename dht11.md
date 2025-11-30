@@ -39,20 +39,34 @@ GND (-)      -> Pin 6 (Ground) or any GND pin
 
 ## Installation
 
-### 1. Install System Dependencies
+### Quick Install (Recommended)
+
+Run the automated installation script:
+
+```bash
+./install-dht11.sh
+```
+
+This script automatically installs all prerequisites and verifies the installation.
+
+### Manual Installation
+
+If you prefer to install manually:
+
+**1. Install System Dependencies**
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y python3-pip libgpiod3
 ```
 
-### 2. Install Python Library
+**2. Install Python Library**
 
 ```bash
 pip3 install adafruit-circuitpython-dht
 ```
 
-### 3. Verify Installation
+**3. Verify Installation**
 
 ```bash
 python3 -c "import board, adafruit_dht; print('DHT library installed successfully')"
