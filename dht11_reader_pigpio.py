@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 """
 DHT11 Temperature and Humidity Sensor Reader (using pigpio)
-Reads DHT11 sensor data from GPIO pin 3 on Raspberry Pi
+Reads DHT11 sensor data from GPIO pin configured in dht11_config.yaml
 Uses pigpio library - more reliable on older/32-bit Raspberry Pi systems
 """
 
 import time
+import yaml
+import os
 import pigpio
 
+# Load configuration
+config_path = os.path.join(os.path.dirname(__file__), 'dht11_config.yaml')
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+
 # GPIO pin for DHT11 data line
-DHT11_PIN = 4  # Physical pin 7
+DHT11_PIN = config['gpio_pin']
 
 class DHT11Reader:
     """
@@ -98,7 +105,7 @@ class DHT11Reader:
 def main():
     """Main loop - continuously read sensor data"""
     print("DHT11 Sensor Reader (pigpio version)")
-    print("Reading from GPIO pin 4 (physical pin 7)")
+    print(f"Reading from GPIO {DHT11_PIN}")
     print("Press Ctrl+C to exit\n")
 
     # Connect to pigpio daemon
@@ -117,12 +124,17 @@ def main():
 
             if temperature_c is not None and humidity is not None:
                 temperature_f = temperature_c * (9 / 5) + 32
-                print(f"Temperature: {temperature_c:.1f}°C / {temperature_f:.1f}°F  |  Humidity: {humidity}%")
+                if config.get('show_both_units', True):
+                    print(f"Temperature: {temperature_c:.1f}°C / {temperature_f:.1f}°F  |  Humidity: {humidity}%")
+                elif config.get('temperature_unit', 'C') == 'F':
+                    print(f"Temperature: {temperature_f:.1f}°F  |  Humidity: {humidity}%")
+                else:
+                    print(f"Temperature: {temperature_c:.1f}°C  |  Humidity: {humidity}%")
             else:
                 print("Failed to read sensor, retrying...")
 
             # DHT11 requires minimum 2 second interval
-            time.sleep(2.0)
+            time.sleep(config.get('read_interval', 2))
 
     except KeyboardInterrupt:
         print("\nExiting...")

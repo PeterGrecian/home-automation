@@ -5,9 +5,16 @@ Checks if pigpio can communicate with the DHT11 sensor
 """
 
 import time
+import yaml
+import os
 import pigpio
 
-DHT11_PIN = 3
+# Load configuration
+config_path = os.path.join(os.path.dirname(__file__), 'dht11_config.yaml')
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+
+DHT11_PIN = config['gpio_pin']
 
 print("DHT11 GPIO Connection Test")
 print("=" * 40)
