@@ -5,9 +5,16 @@ Much simpler and more reliable than manual bit-banging
 """
 
 import time
+import yaml
+import os
 import RPi.GPIO as GPIO
 
-DHT11_PIN = 4  # BCM numbering, physical pin 7
+# Load configuration
+config_path = os.path.join(os.path.dirname(__file__), 'dht11_config.yaml')
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+
+DHT11_PIN = config['gpio_pin']
 
 def read_dht11():
     """
@@ -79,7 +86,7 @@ def read_dht11():
 
 def main():
     print("DHT11 Sensor Reader (Simple version)")
-    print("Reading from GPIO 4 (physical pin 7)")
+    print(f"Reading from GPIO {DHT11_PIN}")
     print("Press Ctrl+C to exit\n")
 
     try:
@@ -88,11 +95,16 @@ def main():
 
             if temp is not None and humidity is not None:
                 temp_f = temp * 9/5 + 32
-                print(f"Temperature: {temp}°C / {temp_f:.1f}°F  |  Humidity: {humidity}%")
+                if config.get('show_both_units', True):
+                    print(f"Temperature: {temp}°C / {temp_f:.1f}°F  |  Humidity: {humidity}%")
+                elif config.get('temperature_unit', 'C') == 'F':
+                    print(f"Temperature: {temp_f:.1f}°F  |  Humidity: {humidity}%")
+                else:
+                    print(f"Temperature: {temp}°C  |  Humidity: {humidity}%")
             else:
                 print("Failed to read sensor, retrying...")
 
-            time.sleep(2)
+            time.sleep(config.get('read_interval', 2))
 
     except KeyboardInterrupt:
         print("\nExiting...")

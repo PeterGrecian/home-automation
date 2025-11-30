@@ -27,8 +27,8 @@ echo "Step 1: Updating package lists..."
 sudo apt-get update
 
 echo ""
-echo "Step 2: Installing pigpio..."
-sudo apt-get install -y pigpio python3-pigpio
+echo "Step 2: Installing pigpio and dependencies..."
+sudo apt-get install -y pigpio python3-pigpio python3-yaml
 
 echo ""
 echo "Step 3: Enabling and starting pigpio daemon..."
