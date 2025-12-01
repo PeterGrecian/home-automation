@@ -10,7 +10,7 @@ This repository includes tools for testing and diagnosing GPIO pins on Raspberry
 - Debugging hardware connections
 - Learning GPIO pin layouts
 
-## GPIO Sequential Flash Test
+## GPIO Sequential Flash Test (Output)
 
 **Script:** `gpio_flash_test.py`
 **Config:** `gpio_flash_config.yaml`
@@ -19,17 +19,39 @@ This repository includes tools for testing and diagnosing GPIO pins on Raspberry
 
 Flashes each GPIO pin sequentially in order, printing both the BCM GPIO number and physical pin number as each pin activates. Connect an LED probe to watch each pin light up in sequence.
 
-### Usage
+## GPIO Sequential Read Test (Input)
+
+**Script:** `gpio_read_test.py`
+**Config:** `gpio_flash_config.yaml` (reuses same config)
+
+### What It Does
+
+Reads each GPIO pin sequentially and displays whether it's HIGH or LOW. Useful for testing input connections, buttons, switches, or verifying signals from other devices. Pins are configured with pull-down resistors (read LOW by default).
+
+### Usage (Flash Test)
 
 ```bash
 python3 gpio_flash_test.py
 ```
 
-The script will:
+### Usage (Read Test)
+
+```bash
+python3 gpio_read_test.py
+```
+
+**Flash Test** will:
 1. Configure all specified GPIO pins as outputs
 2. Flash each pin HIGH for the configured duration
 3. Display the GPIO number and physical pin number
 4. Move to the next pin after a brief pause
+5. Repeat the cycle (infinite loop or configured number of cycles)
+
+**Read Test** will:
+1. Configure all specified GPIO pins as inputs (pull-down)
+2. Read each pin state sequentially
+3. Display the GPIO number, physical pin number, and state (HIGH/LOW)
+4. Pause between reads according to configuration
 5. Repeat the cycle (infinite loop or configured number of cycles)
 
 ### Configuration
@@ -103,7 +125,7 @@ BCM GPIO numbering to physical pin mapping:
 
 Full pinout: https://pinout.xyz
 
-### Example Output
+### Example Output (Flash Test)
 
 ```
 GPIO Sequential Flash Test
@@ -120,6 +142,25 @@ GPIO  6 (Pin 31): ON
 GPIO 12 (Pin 32): ON
 ...
 ```
+
+### Example Output (Read Test)
+
+```
+GPIO Sequential Read Test
+========================================
+Reading 17 GPIO pins
+Read interval: 0.5s
+Pull-down mode: Pins read LOW unless pulled HIGH
+Press Ctrl+C to exit
+
+GPIO  4 (Pin  7): LOW
+GPIO  5 (Pin 29): LOW
+GPIO  6 (Pin 31): HIGH
+GPIO 12 (Pin 32): LOW
+...
+```
+
+In this example, GPIO 6 (pin 31) is reading HIGH because something is pulling it up (connected to 3.3V or another output pin).
 
 ## Basic GPIO Test
 
