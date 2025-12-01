@@ -5,14 +5,16 @@ Home automation project for Raspberry Pi including network device monitoring, se
 ## Components
 
 - **Network Monitor** (`network-monitor/`) - Multi-threaded Python application for tracking device connectivity on local network
-- **DHT11 Sensor Reader** (`dht11_reader.py`) - Temperature and humidity monitoring via GPIO pin 3
+- **DHT11/DHT22 Sensor Reader** - Temperature and humidity monitoring via GPIO (multiple implementations)
+- **GPIO Testing Tools** (`gpio_flash_test.py`) - Sequential GPIO pin testing with LED probe
 - **Proximity Detection** (`proximity.py`) - Wi-Fi and Bluetooth-based presence detection
 - **Google Home Automations** (YAML files) - Time-based automation scripts
 
 ## Documentation
 
 - [Network Monitor Setup](CLAUDE.md#network-monitor-configuration-network-monitorconfigjson)
-- [DHT11 Sensor Guide](dht11.md)
+- [DHT11/DHT22 Sensor Guide](dht11.md)
+- [GPIO Testing Tools](gpio_testing.md)
 
 ## Links
 

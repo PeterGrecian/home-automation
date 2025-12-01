@@ -1,0 +1,32 @@
+# GPIO Flash Test Configuration
+
+# Flash duration (how long each pin stays HIGH) in seconds
+flash_duration: 0.5
+
+# Pause between pins (how long to wait between each pin) in seconds
+pause_between_pins: 0.1
+
+# GPIO pins to test (BCM numbering)
+# Default list excludes special function pins (I2C, SPI, UART)
+# Customize this list to test specific pins
+gpio_pins:
+  - 4   # Physical pin 7
+  - 5   # Physical pin 29
+  - 6   # Physical pin 31
+  - 12  # Physical pin 32
+  - 13  # Physical pin 33
+  - 16  # Physical pin 36
+  - 17  # Physical pin 11
+  - 18  # Physical pin 12
+  - 19  # Physical pin 35
+  - 20  # Physical pin 38
+  - 21  # Physical pin 40
+  - 22  # Physical pin 15
+  - 23  # Physical pin 16
+  - 24  # Physical pin 18
+  - 25  # Physical pin 22
+  - 26  # Physical pin 37
+  - 27  # Physical pin 13
+
+# Number of cycles to run (0 = infinite loop)
+cycles: 0

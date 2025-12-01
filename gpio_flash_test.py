@@ -3,19 +3,24 @@
 GPIO Pin Sequential Flash Test
 Flashes each GPIO pin sequentially for LED testing
 Prints pin number as each pin is activated
+Configuration from gpio_flash_config.yaml
 """
 
 import RPi.GPIO as GPIO
+import yaml
+import os
 import time
 
-# All usable GPIO pins on Raspberry Pi (BCM numbering)
-# Excluding special pins like I2C, SPI, UART by default
-GPIO_PINS = [
-    4, 5, 6, 12, 13, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27
-]
+# Load configuration
+config_path = os.path.join(os.path.dirname(__file__), 'gpio_flash_config.yaml')
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
 
-# Flash duration in seconds
-FLASH_DURATION = 0.5
+# Get settings from config
+GPIO_PINS = config['gpio_pins']
+FLASH_DURATION = config['flash_duration']
+PAUSE_BETWEEN_PINS = config['pause_between_pins']
+CYCLES = config['cycles']
 
 def flash_all_pins():
     """Flash each GPIO pin sequentially"""
@@ -30,11 +35,16 @@ def flash_all_pins():
     print("GPIO Sequential Flash Test")
     print("=" * 40)
     print(f"Testing {len(GPIO_PINS)} GPIO pins")
+    print(f"Flash duration: {FLASH_DURATION}s")
+    print(f"Pause between pins: {PAUSE_BETWEEN_PINS}s")
+    if CYCLES > 0:
+        print(f"Cycles: {CYCLES}")
     print("Connect LED + resistor to GND and each pin")
     print("Press Ctrl+C to exit\n")
 
     try:
-        while True:
+        cycle_count = 0
+        while CYCLES == 0 or cycle_count < CYCLES:
             for pin in GPIO_PINS:
                 # Turn on current pin
                 GPIO.output(pin, GPIO.HIGH)
@@ -43,8 +53,9 @@ def flash_all_pins():
 
                 # Turn off current pin
                 GPIO.output(pin, GPIO.LOW)
-                time.sleep(0.1)  # Brief pause between pins
+                time.sleep(PAUSE_BETWEEN_PINS)
 
+            cycle_count += 1
             print()  # Blank line after full cycle
 
     except KeyboardInterrupt:
