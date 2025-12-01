@@ -105,38 +105,35 @@ To test GPIO pins, build a simple LED probe:
 
 ### GPIO Pin Reference
 
-Physical pin layout with BCM GPIO numbers. Format: `Pin# (GPIO#)` or `Pin# Function`
-
-**Left Side (Odd Pins):**
+Physical pin layout with BCM GPIO numbers.
 
 | Pin | Function       | Pin | Function       |
 |-----|----------------|-----|----------------|
 | 1   | *3V3*          | 2   | <u>5V</u>      |
-| 3   | (2)            | 4   | <u>5V</u>      |
-| 5   | (3)            | 6   | **GND**        |
-| 7   | (4)            | 8   | (14)           |
-| 9   | **GND**        | 10  | (15)           |
-| 11  | (17)           | 12  | (18)           |
-| 13  | (27)           | 14  | **GND**        |
-| 15  | (22)           | 16  | (23)           |
-| 17  | *3V3*          | 18  | (24)           |
-| 19  | (10)           | 20  | **GND**        |
-| 21  | (9)            | 22  | (25)           |
-| 23  | (11)           | 24  | (8)            |
-| 25  | **GND**        | 26  | (7)            |
-| 27  | (0)            | 28  | (1)            |
-| 29  | (5)            | 30  | **GND**        |
-| 31  | (6)            | 32  | (12)           |
-| 33  | (13)           | 34  | **GND**        |
-| 35  | (19)           | 36  | (16)           |
-| 37  | (26)           | 38  | (20)           |
-| 39  | **GND**        | 40  | (21)           |
+| 3   | GPIO 2         | 4   | <u>5V</u>      |
+| 5   | GPIO 3         | 6   | **GND**        |
+| 7   | GPIO 4         | 8   | GPIO 14        |
+| 9   | **GND**        | 10  | GPIO 15        |
+| 11  | GPIO 17        | 12  | GPIO 18        |
+| 13  | GPIO 27        | 14  | **GND**        |
+| 15  | GPIO 22        | 16  | GPIO 23        |
+| 17  | *3V3*          | 18  | GPIO 24        |
+| 19  | GPIO 10        | 20  | **GND**        |
+| 21  | GPIO 9         | 22  | GPIO 25        |
+| 23  | GPIO 11        | 24  | GPIO 8         |
+| 25  | **GND**        | 26  | GPIO 7         |
+| 27  | GPIO 0         | 28  | GPIO 1         |
+| 29  | GPIO 5         | 30  | **GND**        |
+| 31  | GPIO 6         | 32  | GPIO 12        |
+| 33  | GPIO 13        | 34  | **GND**        |
+| 35  | GPIO 19        | 36  | GPIO 16        |
+| 37  | GPIO 26        | 38  | GPIO 20        |
+| 39  | **GND**        | 40  | GPIO 21        |
 
 **Legend:**
 - *3V3* = 3.3V Power (italic)
 - <u>5V</u> = 5V Power (underlined)
 - **GND** = Ground/0V (bold)
-- (GPIO#) = BCM GPIO number in parentheses
 
 Full interactive pinout: https://pinout.xyz
 
