@@ -109,8 +109,8 @@ Physical pin layout with BCM GPIO numbers.
 
 | Pin | Function       | Pin | Function       |
 |-----|----------------|-----|----------------|
-| 1   | *3V3*          | 2   | <u>5V</u>      |
-| 3   | GPIO 2         | 4   | <u>5V</u>      |
+| 1   | *3V3*          | 2   | **5V**         |
+| 3   | GPIO 2         | 4   | **5V**         |
 | 5   | GPIO 3         | 6   | **GND**        |
 | 7   | GPIO 4         | 8   | GPIO 14        |
 | 9   | **GND**        | 10  | GPIO 15        |
@@ -132,7 +132,7 @@ Physical pin layout with BCM GPIO numbers.
 
 **Legend:**
 - *3V3* = 3.3V Power (italic)
-- <u>5V</u> = 5V Power (underlined)
+- **5V** = 5V Power (bold)
 - **GND** = Ground/0V (bold)
 
 Full interactive pinout: https://pinout.xyz
