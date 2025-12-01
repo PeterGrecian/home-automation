@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Simple DHT11 reader using DHT11 library
-Much simpler and more reliable than manual bit-banging
+Simple DHT11/DHT22 reader
+Supports both DHT11 and DHT22 (AM2302) sensors
+Sensor type configured in dht11_config.yaml
 """
 
 import time
@@ -16,11 +17,13 @@ with open(config_path, 'r') as f:
 
 DHT11_PIN = config['gpio_pin']
 
-def read_dht11():
+def read_dht_sensor():
     """
-    Read DHT11 sensor using bit-banging.
+    Read DHT11 or DHT22 sensor using bit-banging.
+    Sensor type determined by config.
     Returns (temperature, humidity) or (None, None) on error.
     """
+    sensor_type = config.get('sensor_type', 'DHT11').upper()
     # Setup
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
@@ -79,19 +82,32 @@ def read_dht11():
 
     # Verify checksum
     if checksum == ((humidity_int + humidity_dec + temp_int + temp_dec) & 0xFF):
-        return temp_int, humidity_int
+        if sensor_type == 'DHT22':
+            # DHT22 returns 16-bit values with decimal
+            humidity = ((humidity_int << 8) | humidity_dec) / 10.0
+            temp = ((temp_int << 8) | temp_dec) / 10.0
+            # Handle negative temperatures for DHT22
+            if temp_int & 0x80:
+                temp = -temp
+        else:
+            # DHT11 returns integer values
+            temp = temp_int
+            humidity = humidity_int
+
+        return temp, humidity
     else:
         return None, None
 
 
 def main():
-    print("DHT11 Sensor Reader (Simple version)")
+    sensor_type = config.get('sensor_type', 'DHT11')
+    print(f"{sensor_type} Sensor Reader")
     print(f"Reading from GPIO {DHT11_PIN}")
     print("Press Ctrl+C to exit\n")
 
     try:
         while True:
-            temp, humidity = read_dht11()
+            temp, humidity = read_dht_sensor()
 
             if temp is not None and humidity is not None:
                 temp_f = temp * 9/5 + 32

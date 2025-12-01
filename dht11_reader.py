@@ -1,15 +1,31 @@
 #!/usr/bin/env python3
 """
-DHT11 Temperature and Humidity Sensor Reader
-Reads DHT11 sensor data from GPIO pin 3 on Raspberry Pi
+DHT11/DHT22 Temperature and Humidity Sensor Reader (Adafruit library)
+Supports both DHT11 and DHT22 sensors
+Configuration from dht11_config.yaml
 """
 
 import time
+import yaml
+import os
 import board
 import adafruit_dht
 
-# Initialize DHT11 sensor on GPIO pin 3 (board.D3)
-dht_device = adafruit_dht.DHT11(board.D3)
+# Load configuration
+config_path = os.path.join(os.path.dirname(__file__), 'dht11_config.yaml')
+with open(config_path, 'r') as f:
+    config = yaml.safe_load(f)
+
+# Get GPIO pin dynamically
+gpio_pin = config['gpio_pin']
+pin = getattr(board, f'D{gpio_pin}')
+
+# Initialize sensor based on type
+sensor_type = config.get('sensor_type', 'DHT11').upper()
+if sensor_type == 'DHT22':
+    dht_device = adafruit_dht.DHT22(pin, use_pulseio=False)
+else:
+    dht_device = adafruit_dht.DHT11(pin, use_pulseio=False)
 
 def read_sensor():
     """
@@ -33,9 +49,9 @@ def read_sensor():
 
 
 def main():
-    """Main loop - continuously read sensor data every 2 seconds"""
-    print("DHT11 Sensor Reader")
-    print("Reading from GPIO pin 3 (board.D3)")
+    """Main loop - continuously read sensor data"""
+    print(f"{sensor_type} Sensor Reader (Adafruit library)")
+    print(f"Reading from GPIO {gpio_pin}")
     print("Press Ctrl+C to exit\n")
 
     try:
@@ -44,12 +60,17 @@ def main():
 
             if temperature_c is not None and humidity is not None:
                 temperature_f = temperature_c * (9 / 5) + 32
-                print(f"Temperature: {temperature_c:.1f}°C / {temperature_f:.1f}°F  |  Humidity: {humidity}%")
+                if config.get('show_both_units', True):
+                    print(f"Temperature: {temperature_c:.1f}°C / {temperature_f:.1f}°F  |  Humidity: {humidity:.1f}%")
+                elif config.get('temperature_unit', 'C') == 'F':
+                    print(f"Temperature: {temperature_f:.1f}°F  |  Humidity: {humidity:.1f}%")
+                else:
+                    print(f"Temperature: {temperature_c:.1f}°C  |  Humidity: {humidity:.1f}%")
             else:
                 print("Failed to read sensor, retrying...")
 
-            # DHT11 sensor requires minimum 2 second interval between reads
-            time.sleep(2.0)
+            # Sensor requires minimum 2 second interval between reads
+            time.sleep(config.get('read_interval', 2))
 
     except KeyboardInterrupt:
         print("\nExiting...")

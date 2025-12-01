@@ -7,8 +7,11 @@
 #   GPIO 27 = Physical pin 13
 gpio_pin: 4
 
-# Sensor type (for future expansion)
-sensor_type: "DHT11"
+# Sensor type: DHT11 or DHT22 (also known as AM2302)
+# DHT22 is more accurate and reliable
+# - DHT11: 0-50°C (±2°C), 20-90% RH (±5%)
+# - DHT22: -40-80°C (±0.5°C), 0-100% RH (±2%)
+sensor_type: "DHT11"  # Change to "DHT22" if using DHT22/AM2302
 
 # Reading interval in seconds
 read_interval: 2
