@@ -185,6 +185,25 @@ pip install scapy pybluez requests
 - The project is designed to run on Raspberry Pi (ARM Linux)
 - Git repo tracked at: https://github.com/users/PeterGrecian/projects/12/views/1
 
+## TODO
+
+### In Progress
+- Configure switch #4 EIGHTREE ET36
+- Monitor the switches from a Pi with Python
+- Zigbee/wifi temperature and power infrastructure and HA software on Pi
+- Test DHT11s with Pi GPIO
+
+### Todo
+- Python for Google Home
+- Add door to network shelf
+- Female dupont resistor/LED probe
+- Configure Energy Dashboard in Home Assistant
+- Configure DHT22 after delivery
+- Design curtain automation system
+- Get good Pi PSUs
+- Google Cloud OAuth for Matter switches
+- Return defective TH01 sensor + Sandstrom switches
+
 ## Data Analysis
 
 Network monitor device files can be analyzed directly (CSV format) or queried programmatically:
