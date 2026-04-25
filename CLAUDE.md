@@ -7,6 +7,9 @@ Home automation for managing smart switches, temperature sensors, Google Home, a
 - `network-monitor/` — multi-threaded Python app tracking device connectivity via arp-scan + ping
 - `proximity.py` — Wi-Fi/Bluetooth presence detection for automation triggers
 - `evening-lights.yaml`, `on-off-test.yaml` — Google Home time-based automations
+- `docs/` — setup notes (Home Assistant, etc.)
+
+DHT11 / Pi GPIO sensor work has moved to `~/Berrylands/dht11/`.
 
 ## Running
 
@@ -37,13 +40,11 @@ Runs on Raspberry Pi (ARM Linux). System deps: `arp-scan`, `nmap`, optionally `f
 - Configure switch #4 EIGHTREE ET36
 - Monitor the switches from a Pi with Python
 - Zigbee/wifi temperature and power infrastructure and HA software on Pi
-- Test DHT11s with Pi GPIO
 
 ### Todo
 - Python for Google Home
 - Add door to network shelf
 - Female dupont resistor/LED probe
 - Configure Energy Dashboard in Home Assistant
-- Configure DHT22 after delivery
 - Design curtain automation system
 - Google Cloud OAuth for Matter switches
