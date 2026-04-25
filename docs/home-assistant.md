@@ -51,6 +51,31 @@ The 3-minute delay avoids false triggers from mid-cycle pauses (rinse, spin-up).
 3. POST to `/api/services/automation/reload` to pick up the new automation without restarting HA.
 4. Turn the switch on so the enable-condition is satisfied.
 
+## Matter Server
+
+Matter support is provided by a separate `python-matter-server` Docker container running alongside the HA container on homepi (HA Container install — no add-ons available).
+
+```
+sudo docker run -d \
+  --name matter-server \
+  --restart unless-stopped \
+  --network host \
+  -v /opt/matter-server/data:/data \
+  ghcr.io/home-assistant-libs/python-matter-server:stable
+```
+
+`--network host` is required: Matter discovery uses mDNS / IPv6 multicast.
+
+The Matter integration in HA is configured to talk to it at `ws://localhost:5580/ws`.
+
+### Adding a Matter device
+
+1. Put the device into commissioning mode (or, if already paired to another fabric e.g. Google Home, use that platform's "Link to another Matter platform" / "share to" flow to generate an 11-digit pairing code).
+2. In HA: Settings → Devices → Add → Matter → enter the pairing code.
+3. Phone must be on the same WiFi as the device, with Bluetooth on, within a few metres.
+
+Multi-fabric sharing from Google Home can be flaky ("Can't set up device" with no detail). Common fixes: force-close Google Home, toggle Bluetooth, retry, or long-press the device button to force commissioning mode. If it persistently fails, factory-reset the device and pair to HA first using the QR code printed on the device, then share back to Google Home — but only if you still have access to that QR.
+
 ## Renaming an entity
 
 Entity-id renames need the WebSocket API (REST does not expose this):
