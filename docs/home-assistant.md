@@ -35,7 +35,7 @@ Both washing machine and tumble dryer share the same pattern:
 - **Actions** —
   - TTS "The X has finished." to `media_player.living_room`, `media_player.kitchen_display`, `media_player.lab_speaker` (via `tts.google_translate_en_com`)
   - `notify.mobile_app_homepi` push notification
-  - `rest_command.alerting_fire`
+  - `rest_command.alerting_fire` with `data: {title, detail, severity?}` (severity defaults to `warn`, so Slack + xMatters both fire)
 
 | Appliance | Power sensor | Switch (enable) | Automation |
 |---|---|---|---|
@@ -44,10 +44,25 @@ Both washing machine and tumble dryer share the same pattern:
 
 The 3-minute delay avoids false triggers from mid-cycle pauses (rinse, spin-up). The 5 W threshold may need tuning for appliances with higher standby draw.
 
+### `rest_command.alerting_fire`
+
+Defined in `homepi:/home/pi/homeassistant/configuration.yaml` (not in git — back up before editing). Templated payload posts to the alerting API Gateway:
+
+```yaml
+rest_command:
+  alerting_fire:
+    url: "https://b5wgk4mp4g.execute-api.eu-west-1.amazonaws.com/alert"
+    method: POST
+    content_type: "application/json"
+    payload: '{"source": "home-assistant", "severity": "{{ severity | default(''warn'') }}", "title": "{{ title }}", "detail": "{{ detail | default('''') }}"}'
+```
+
+Callers pass `data: {title, detail, severity?}`. Severity defaults to `warn` (Slack + xMatters); use `info` for non-paging notifications (Slack only).
+
 ## Adding a new appliance alert
 
 1. Confirm the plug exposes a `*_power` sensor and a `switch.*` entity (rename the switch via the entity registry if its friendly name is misleading).
-2. POST to `/api/config/automation/config/<id>` with the same shape as `automation.washing_machine_finished`, swapping entity IDs and the spoken message.
+2. POST to `/api/config/automation/config/<id>` with the same shape as `automation.washing_machine_finished`, swapping entity IDs, the spoken message, and the `rest_command.alerting_fire` `title`/`detail` payload.
 3. POST to `/api/services/automation/reload` to pick up the new automation without restarting HA.
 4. Turn the switch on so the enable-condition is satisfied.
 
