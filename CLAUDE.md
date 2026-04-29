@@ -14,6 +14,7 @@ DHT11 / Pi GPIO sensor work has moved to `~/Berrylands/dht11/`.
 ## Network / WiFi notes
 
 - **Pink (B) and Cyan (B)** (`1C:64:99:*` BSSIDs) are powerline adaptors (not the ISP router) connected to the Eeros via ethernet. They also broadcast WiFi and join the `Grecian2SeymourGdns` SSID. Cyan (5 GHz) is unreliable and drops out. Pink (2.4 GHz) is stable and Google Home devices use it.
+- **Yellow (A) and Green (A)** are in the lab, next to homepi.
 - The Eeros do band steering and won't honour 2.4 GHz locks from the laptop — Google devices get 2.4 GHz because they hardcode it in firmware.
 
 ## Running
