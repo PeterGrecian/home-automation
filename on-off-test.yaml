@@ -1,6 +1,12 @@
+# =============================================================================
+# DISABLED 2026-05-17 — toggle off in Google Home app (Automations).
+# This YAML is reference only; Google Home does not sync from this file.
+# Lights tested working; no longer need the half-hourly cycle.
+# =============================================================================
+
 metadata:
-  name: Lab lights hourly on/off routine
-  description: Lights turn on at the start of each hour and off at the half hour, between 10:00 AM and 4:00 PM.
+  name: Lab lights hourly on/off routine [DISABLED]
+  description: DISABLED 2026-05-17. Lights turn on at the start of each hour and off at the half hour, between 10:00 AM and 4:00 PM.
 
 automations:
   # Turn on the lab lights at the start of each hour (10 AM to 4 PM)
