@@ -1,15 +1,15 @@
 # Home Assistant
 
-Home Assistant runs on **homepi** (Raspberry Pi 4, 192.168.4.71). It is the central hub for all smart-plug automations, Zigbee devices (ZHA), and Google Home / media-player TTS alerts.
+Home Assistant runs on **homepi** (Raspberry Pi 4, 192.168.0.53). It is the central hub for all smart-plug automations, Zigbee devices (ZHA), and Google Home / media-player TTS alerts.
 
 ## Access
 
 | | |
 |---|---|
-| URL | http://192.168.4.71:8123 |
+| URL | http://192.168.0.53:8123 |
 | API token | `super/bin/secrets get /home-automation/ha-claude` |
 | Auth | `Authorization: Bearer <token>` |
-| WebSocket | `ws://192.168.4.71:8123/api/websocket` (needed for entity registry edits) |
+| WebSocket | `ws://192.168.0.53:8123/api/websocket` (needed for entity registry edits) |
 
 `homepi.local` mDNS is unreliable from `pip` — use the IP, or check pi-fleet.
 
@@ -35,7 +35,7 @@ Both washing machine and tumble dryer share the same pattern:
 - **Actions** —
   - TTS "The X has finished." to `media_player.living_room`, `media_player.kitchen_display`, `media_player.lab_speaker` (via `tts.google_translate_en_com`)
   - `notify.mobile_app_homepi` push notification
-  - `rest_command.alerting_fire` with `data: {title, detail, severity?}` (severity defaults to `warn`, so Slack + xMatters both fire)
+  - `rest_command.alerting_fire` with `data: {title, detail, severity, slack}` — laundry alerts use `severity: warn` (Slack + xMatters page) and `slack: laundry` (routes to the #laundry channel rather than the default `alerts`)
 
 | Appliance | Power sensor | Switch (enable) | Automation |
 |---|---|---|---|
@@ -65,6 +65,25 @@ Callers pass `data: {title, detail, severity?}`. Severity defaults to `warn` (Sl
 2. POST to `/api/config/automation/config/<id>` with the same shape as `automation.washing_machine_finished`, swapping entity IDs, the spoken message, and the `rest_command.alerting_fire` `title`/`detail` payload.
 3. POST to `/api/services/automation/reload` to pick up the new automation without restarting HA.
 4. Turn the switch on so the enable-condition is satisfied.
+
+## HA container
+
+HA runs as a manually-managed Docker container on homepi (not Ansible-deployed; only `configuration.yaml` is templated via the `apps/homeassistant` role). Recreate with:
+
+```
+sudo docker run -d \
+  --name homeassistant \
+  --restart unless-stopped \
+  --privileged \
+  --network host \
+  -e TZ=Europe/London \
+  --dns 194.168.4.100 --dns 194.168.8.100 --dns 1.1.1.1 \
+  --device /dev/ttyUSB0:/dev/ttyUSB0 \
+  -v /home/pi/homeassistant:/config \
+  ghcr.io/home-assistant/home-assistant:stable
+```
+
+`--dns` is required. Without it the container inherits `/etc/resolv.conf` from the host at run time, which can capture Tailscale nameservers (`100.100.100.100`) that become unreachable if Tailscale later goes down — symptom: TTS silently fails (`Failed to connect. Probable cause: Unknown` in HA error log), metno/Octopus integrations time out, SSDP errors. Explicit `--dns` pins resolvers regardless of host state.
 
 ## Matter Server
 
