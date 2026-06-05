@@ -35,7 +35,7 @@ Both washing machine and tumble dryer share the same pattern:
 - **Actions** —
   - TTS "The X has finished." to `media_player.living_room`, `media_player.kitchen_display`, `media_player.lab_speaker` (via `tts.google_translate_en_com`)
   - `notify.mobile_app_homepi` push notification
-  - `rest_command.alerting_fire` with `data: {title, detail, severity, slack}` — laundry alerts use `severity: warn` (Slack + xMatters page) and `slack: laundry` (routes to the #laundry channel rather than the default `alerts`)
+  - `rest_command.alerting_fire` with `data: {title, detail, severity, slack}` — laundry alerts use `severity: info` (Slack only, no xMatters page — laundry doesn't warrant paging) and `slack: laundry` (routes to the #laundry channel rather than the default `alerts`)
 
 | Appliance | Power sensor | Switch (enable) | Automation |
 |---|---|---|---|
