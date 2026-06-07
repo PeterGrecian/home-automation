@@ -54,10 +54,20 @@ rest_command:
     url: "https://b5wgk4mp4g.execute-api.eu-west-1.amazonaws.com/alert"
     method: POST
     content_type: "application/json"
-    payload: '{"source": "home-assistant", "severity": "{{ severity | default(''warn'') }}", "title": "{{ title }}", "detail": "{{ detail | default('''') }}"}'
+    payload_template: >-
+      {{ {
+        'source': 'home-assistant',
+        'severity': severity | default('info'),
+        'title': title,
+        'detail': detail | default(''),
+      } | combine(
+        {'slack':    slack}    if slack    is defined else {},
+        {'xmatters': xmatters} if xmatters is defined else {},
+        {'appraise': appraise} if appraise is defined else {}
+      ) | to_json }}
 ```
 
-Callers pass `data: {title, detail, severity?}`. Severity defaults to `warn` (Slack + xMatters); use `info` for non-paging notifications (Slack only).
+Callers pass `data: {title, detail, severity?, slack?, xmatters?, appraise?}`. **Severity defaults to `info` (Slack-only, no xMatters page)** — anything that should page must set `severity: warn` or `critical` explicitly. This way, forgetting a field in a notification automation never pages.
 
 ## Adding a new appliance alert
 
