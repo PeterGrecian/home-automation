@@ -44,6 +44,10 @@ Both washing machine and tumble dryer share the same pattern:
 
 The 3-minute delay avoids false triggers from mid-cycle pauses (rinse, spin-up). The 5 W threshold may need tuning for appliances with higher standby draw.
 
+### Coordinator watchdog
+
+`automation.zigbee_coordinator_offline_watchdog` fires `alerting_fire` (**severity `warn`** — pages via xMatters, plus `slack: laundry`) if either laundry power sensor stays `unavailable` for 15 min. This catches ZHA/USB-coordinator dropouts the same day instead of only noticing when a wash finishes and no alert arrives (which cost us 10 days in the 2026-06-25 incident — see Troubleshooting). The appliance-finished automations rely on live power sensors, so if the coordinator drops, they silently never fire.
+
 ### `rest_command.alerting_fire`
 
 Defined in `homepi:/home/pi/homeassistant/configuration.yaml` (not in git — back up before editing). Templated payload posts to the alerting API Gateway:
@@ -54,7 +58,7 @@ rest_command:
     url: "https://b5wgk4mp4g.execute-api.eu-west-1.amazonaws.com/alert"
     method: POST
     content_type: "application/json"
-    payload_template: >-
+    payload: >-
       {{ {
         'source': 'home-assistant',
         'severity': severity | default('info'),
@@ -68,6 +72,8 @@ rest_command:
 ```
 
 Callers pass `data: {title, detail, severity?, slack?, xmatters?, appraise?}`. **Severity defaults to `info` (Slack-only, no xMatters page)** — anything that should page must set `severity: warn` or `critical` explicitly. This way, forgetting a field in a notification automation never pages.
+
+> **The key is `payload`, not `payload_template`.** HA renamed this option; `payload_template` fails config validation (`'payload_template' is an invalid option for 'rest_command'`) and the whole `rest_command` domain silently fails to load — so `alerting_fire` won't exist and every alert POST is a no-op. This bit us 2026-06-07 → 2026-07-04 (see Troubleshooting).
 
 ## Adding a new appliance alert
 
@@ -133,3 +139,30 @@ Entity-id renames need the WebSocket API (REST does not expose this):
 ```
 
 Send after the `auth_ok` handshake.
+
+## Troubleshooting
+
+### Laundry alerts stopped firing (2026-06-25 → 2026-07-04)
+
+Two independent faults, either of which alone silences laundry alerts:
+
+1. **Zigbee coordinator dropped off USB.** At 2026-06-25 09:30 UTC the HA log showed
+   `bellows … Fatal write error on serial transport … write failed: [Errno 19] No such device`
+   and every ZHA entity went `unavailable`. Root cause: **Pi undervoltage** — `vcgencmd
+   get_throttled` read `0x50005` (bit 0 = under-voltage now, bit 16 = has occurred) with
+   thousands of `Undervoltage detected!` lines in dmesg. The CP210x dongle browned out and
+   left the USB bus; `lsusb` and `/dev/ttyUSB0` showed nothing. Re-plugging did not help
+   while power was still sagging. **A reboot re-enumerated it** (same path `/dev/ttyUSB0`,
+   stable id `usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_...`) — but the real fix is a
+   **new PSU + good USB-C cable**. Until `get_throttled` clears bit 0, expect repeat dropouts.
+   Consider a powered USB hub so the dongle isn't on the Pi's rail.
+2. **`rest_command` broke on 2026-06-07** — config used the deprecated `payload_template`
+   key (now `payload`), so the `rest_command` domain failed validation and `alerting_fire`
+   never registered. Even after Zigbee recovered, alert POSTs were no-ops until this was
+   fixed. See `rest_command.alerting_fire` above.
+
+**Fast diagnosis checklist when laundry (or any ZHA) alerts go quiet:**
+- `curl .../api/states/sensor.washing_machine_power` → `unavailable`? Coordinator is down.
+- On homepi: `vcgencmd get_throttled` (want bit 0 clear), `lsusb | grep 10c4`, `ls /dev/ttyUSB*`.
+- `docker logs homeassistant 2>&1 | grep -iE "rest_command|Invalid config"` → catches the payload-key regression.
+- `automation.zigbee_coordinator_offline_watchdog` now pages if the sensors stay `unavailable` 15 min.
