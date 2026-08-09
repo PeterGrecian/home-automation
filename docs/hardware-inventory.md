@@ -10,6 +10,12 @@ Snapshot taken **2026-08-09** from the live HA device registry
 homepi. Cloud-only "devices" that aren't hardware (Sun, Backup, HACS, Forecast,
 Octopus tariff entries) are omitted.
 
+> **Scope caveat — HA is not the whole estate.** Devices deliberately left in
+> their native ecosystem (Smart Life / eWeLink → Google Home) never appear in
+> the HA registry, so a registry-derived inventory silently under-reports.
+> The Wi-Fi plugs below were missed on the first pass for exactly this reason.
+> Treat the HA-derived tables as "what HA can see", not "what exists".
+
 ## The hub
 
 | | |
@@ -68,14 +74,24 @@ harmless.
 | Lab Temperature | SONOFF SNZB-02D | Temp/humidity sensor |
 | eWeLink TH01 | eWeLink TH01 | Temp/humidity sensor |
 
-> **Correction to [home-assistant.md](home-assistant.md):** that doc lists
-> "four Sonoff plugs", two of them Wi-Fi in the Lab. As of 2026-08-09 the
-> registry holds **only these two Zigbee plugs** — there are no Wi-Fi Sonoff
-> plug devices or entities. `light.lights_east` is a `switch_as_x` helper
-> wrapping the **Matter** plug, not a Sonoff. The only switch entities that
-> exist are `switch.washing_machine`, `switch.tumble_dryer`,
-> `switch.smart_plug` (node 7) and `switch.sandstrom_wi_fi_smart_plug`
-> (node 4, dead).
+## Wi-Fi plugs — deliberately NOT in HA
+
+Three Wi-Fi smart plugs are in service but **absent from the HA device
+registry by design**, per the policy in
+[ecosystem-map.md](ecosystem-map.md#composition-one-device-one-primary-path):
+simple plugs stay in their native ecosystem and reach Google Home directly,
+bypassing HA.
+
+| Plug | Drives | Path |
+|---|---|---|
+| Wi-Fi smart plug | Air shower fans | Smart Life / eWeLink → Google Home |
+| Wi-Fi smart plug | Laboratory lighting | Smart Life / eWeLink → Google Home |
+| Wi-Fi smart plug | Laboratory lighting | Smart Life / eWeLink → Google Home |
+
+**They cannot be seen from homepi** — no HA entity, no Matter node, no Zigbee
+join. Confirm them in the Smart Life / eWeLink / Google Home apps. Anything
+built from the HA registry alone (including the tables above) will miss them;
+that is the expected outcome of the bypass policy, not a fault.
 
 ## Google Cast
 
@@ -106,3 +122,12 @@ Cast **groups** (Everywhere, Holiday, house, Party) are virtual, not hardware.
 - **matter-server is not in IaC** — a homepi reprovision loses the BLE flags and
   breaks the EOS reset path. Owned by the astro-canon strand.
 - **Node 4 ghost** still on the fabric. Deliberate, removable via `remove_node`.
+- **`light.lights_east` points at the wrong device.** The `switch_as_x` helper
+  wraps **`switch.tumble_dryer`** (verified in `core.config_entries`,
+  2026-08-09), so switching "Lights East" switches the *tumble dryer*.
+  `home-assistant.md` describes it as lab lighting on a Wi-Fi Sonoff; the real
+  lab-lighting plugs are the Wi-Fi ones above, which HA cannot reach at all.
+  Looks like a misconfiguration — needs repointing or deleting.
+- **The three Wi-Fi plugs are undocumented beyond this file** — no model
+  numbers, IPs or app-account details recorded. Worth capturing from the
+  Smart Life / eWeLink apps.
