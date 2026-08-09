@@ -59,6 +59,36 @@ doesn't permit third-party assistants on them. Local voice would need its own
 mic hardware (ESP32-S3 Voice PE, Wyoming satellite). The existing
 `mcp_server | Assist` entry is for LLM/agent access, not speaker voice.
 
+### Buttons for lab lighting — use Matter, not Zigbee (2026-08-09)
+
+Wanted: a **physical button** for the lab late at night (no wake word, no
+phone, doesn't wake the house) **and** keep voice. Button matters more.
+
+**Zigbee is the wrong choice here.** Moving lab lighting to Zigbee pulls it
+into HA, and HA has no voice path (see above) — so it would *trade away* the
+Google voice control those plugs have today rather than add to it.
+
+**Matter gives both, with no subscription.** A Matter plug joins Google Home
+**and** HA simultaneously (multi-admin, the point of Matter):
+
+- **Voice** — pairs natively to Google Home, local, no Smart Life cloud
+- **Button** — also visible in HA, so a Zigbee button in ZHA can switch it
+- **No bridge needed** — sidesteps the Nabu Casa / GCP-OAuth decision entirely
+
+Infrastructure already present, nothing to buy beyond the plugs:
+
+- Matter commissioning works headlessly (proven twice, nodes 4 and 7)
+- `hci0` BLE on homepi for commissioning
+- **Three Google Nest Hubs = Thread border routers** already in the house
+
+**Buy Matter-over-Wi-Fi plugs**, not Thread. `thread_credentials_set` is
+`False` on the matter-server, so Wi-Fi Matter works today with zero extra
+setup (node 7 is exactly this), whereas Thread would first need credentials
+shared out of the Google fabric.
+
+Then add a Zigbee button (ZHA, coordinator already present) bound to the
+plug's HA entity. Status: **decided, not yet bought or built.**
+
 ### Why the fans are reliable and everything else barfs
 
 Chain length. The air-shower fans are **plug → Smart Life → Google Home**:
