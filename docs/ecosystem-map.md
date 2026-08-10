@@ -15,14 +15,14 @@ How the various smart-home apps, clouds, and protocols fit together — and wher
 Other ecosystems worth knowing about (not currently in use here):
 
 - **Tasmota** — alternative custom firmware for ESP-based devices. Talks MQTT to HA.
-- **Matter / Thread** — newer cross-vendor standard. Google Home, HA, and Apple Home all support it.
+- **Matter / Thread** — newer cross-vendor standard. Google Home, HA, and Apple Home all support it. **See [protocols.md](protocols.md)** for how Wi-Fi/Zigbee/Thread/Matter actually relate (Matter is a *language*, Thread a *transport*), what we own, and why Matter's multi-admin is what gets a device both voice and an HA button.
 - **Apple Home** — only matters with iOS users.
 
 ## Composition: one device, one primary path
 
 For each physical device pick **one** "primary" integration. Everything else inherits.
 
-- **Zigbee Sonoff plugs** (washing machine, tumble dryer) → ZHA in HA → exposed to Google Home via HA. No Sonoff cloud or eWeLink app needed.
+- **Zigbee Sonoff plugs** (washing machine, tumble dryer) → ZHA in HA. No Sonoff cloud or eWeLink app needed. **NOT exposed to Google Home** — verified 2026-08-10, there is no `google_assistant`/`cloud` integration and `exposed_entities` is empty, so nothing in HA reaches an assistant. They don't need voice: they are **measure-only**, watched for the end-of-cycle power drop and never switched (see [integration-policy.md](integration-policy.md)).
 - **WiFi Sonoff plugs** (lab lights) → Smart Life or eWeLink → Google Home directly. Bypasses HA. Matches the policy of leaving simple plugs in their native ecosystem.
 - **Tuya plugs that need HA logic** (Eightree ET36 — auto-power-cycling zeropi/springpi) → LocalTuya → HA → optionally re-exposed to Google Home for voice. Smart Life app keeps working in parallel because it speaks the same LAN protocol.
 - **ESPHome custom boards** (future) → direct ESPHome → HA. No cloud.
