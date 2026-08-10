@@ -15,32 +15,40 @@ Home Assistant runs on **homepi** (Raspberry Pi 4, 192.168.0.53). It is the cent
 
 ## Smart plug fleet
 
-Four Sonoff plugs:
+**Two** Zigbee plugs are in HA. The lab Wi-Fi plugs are **not** — they bypass HA entirely (see below).
 
 | Plug | Type | Location | Purpose | Switch entity |
 |---|---|---|---|---|
-| Sonoff (WiFi) | WiFi | Lab | Lights East | `switch.sonoff_s60zbtpg` |
-| Sonoff (WiFi) | WiFi | Lab | Lights (other) | TBD |
 | Sonoff S60ZBTPG | Zigbee (ZHA) | Utility room | Washing machine | `switch.washing_machine` |
 | Sonoff S60ZBTPG | Zigbee (ZHA) | Utility room | Tumble dryer | `switch.tumble_dryer` |
 
-The Zigbee plugs expose power/voltage/current/summation sensors used by the appliance-finished automations.
+Both expose power/voltage/current/summation sensors, which is the entire reason they are in HA.
+
+**These plugs are MEASURE-ONLY.** They watch for the end-of-cycle power drop and must never switch the appliance — switching one mid-cycle kills a load. Their switch entities are therefore not exposed on the dashboard as toggles, and nothing in HA calls `turn_off` on them. See [integration-policy.md](integration-policy.md) for the three unwanted power-control paths found and closed on 2026-08-10.
+
+### The lab Wi-Fi plugs are outside HA
+
+Three Wi-Fi plugs exist — air shower fans, and two for lab lighting — reached via Smart Life/eWeLink → Google Home, bypassing HA by design ([ecosystem-map.md](ecosystem-map.md)). **They have no HA entity**, so they cannot be scripted, automated, or driven by an HA button.
+
+An earlier version of this table listed two of them as HA plugs, with `switch.sonoff_s60zbtpg` as the "Lights East" entity. No such switch entity exists — the tumble dryer's switch is `switch.tumble_dryer`; only its *sensors* kept the generic `sonoff_s60zbtpg` name. What did exist was `light.lights_east`, a `switch_as_x` helper wrapping `switch.tumble_dryer`, so "Lights East" switched the **dryer**, not any lab light. The helper was deleted 2026-08-10.
 
 ## Appliance-finished automations
 
 Both washing machine and tumble dryer share the same pattern:
 
 - **Trigger** — power sensor below 5 W for 3 minutes
-- **Condition** — the plug's switch entity is `on` (used as a manual enable/disable flag — turn it on when you start a load)
+- **Condition** — **none** (`conditions: []`). Previously gated on the plug's switch entity being `on`, used as a manual enable flag. Dropped 2026-08-10: making the switch an arming control meant routinely toggling a plug that must never be switched. The power drop alone means the cycle finished.
 - **Actions** —
   - TTS "The X has finished." to `media_player.living_room`, `media_player.kitchen_display`, `media_player.lab_speaker` (via `tts.google_translate_en_com`)
   - `notify.mobile_app_homepi` push notification
   - `rest_command.alerting_fire` with `data: {title, detail, severity, slack}` — laundry alerts use `severity: info` (Slack only, no xMatters page — laundry doesn't warrant paging) and `slack: laundry` (routes to the #laundry channel rather than the default `alerts`)
 
-| Appliance | Power sensor | Switch (enable) | Automation |
-|---|---|---|---|
-| Washing machine | `sensor.washing_machine_power` | `switch.washing_machine` | `automation.washing_machine_finished` |
-| Tumble dryer | `sensor.sonoff_s60zbtpg_power` | `switch.tumble_dryer` | `automation.tumble_dryer_finished` |
+| Appliance | Power sensor | Automation |
+|---|---|---|
+| Washing machine | `sensor.washing_machine_power` | `automation.washing_machine_finished` |
+| Tumble dryer | `sensor.sonoff_s60zbtpg_power` | `automation.tumble_dryer_finished` |
+
+Note the tumble dryer's sensors are named `sensor.sonoff_s60zbtpg_*`, not `sensor.tumble_dryer_*` — the device was never renamed at the entity level, so the generic model name persists. Easy to misread as a third plug.
 
 The 3-minute delay avoids false triggers from mid-cycle pauses (rinse, spin-up). The 5 W threshold may need tuning for appliances with higher standby draw.
 
