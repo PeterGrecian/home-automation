@@ -46,9 +46,11 @@ Both washing machine and tumble dryer share the same pattern:
 | Appliance | Power sensor | Automation |
 |---|---|---|
 | Washing machine | `sensor.washing_machine_power` | `automation.washing_machine_finished` |
-| Tumble dryer | `sensor.sonoff_s60zbtpg_power` | `automation.tumble_dryer_finished` |
+| Tumble dryer | `sensor.tumble_dryer_power` | `automation.tumble_dryer_finished` |
 
-Note the tumble dryer's sensors are named `sensor.sonoff_s60zbtpg_*`, not `sensor.tumble_dryer_*` — the device was never renamed at the entity level, so the generic model name persists. Easy to misread as a third plug.
+The dryer's entities were renamed `sonoff_s60zbtpg_*` → `tumble_dryer_*` on 2026-08-12, so all three S60ZBTPG plugs now carry appliance names rather than the model name. Previously the dryer kept the generic model id (it was never renamed at the entity level), which was **a live footgun, not just a readability problem**: a third S60ZBTPG (`canon_eos_power`, the EOS plug) joined the same coordinator, and anything matching that model *by name* rather than by entity id would have switched **the dryer**. Same shape as the `light.lights_east` fault and the node-4 Sandstrom ghost. **Match on entity id, never on model name.**
+
+Renaming entity ids does **not** update references — `automations.yaml` (dryer-finished trigger, coordinator watchdog) and the status dashboard were updated by hand at the same time, and automations reloaded. Anything renamed here must have its references swept the same way.
 
 The 3-minute delay avoids false triggers from mid-cycle pauses (rinse, spin-up). The 5 W threshold may need tuning for appliances with higher standby draw.
 
