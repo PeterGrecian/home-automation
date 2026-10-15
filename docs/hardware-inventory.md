@@ -82,11 +82,15 @@ registry by design**, per the policy in
 simple plugs stay in their native ecosystem and reach Google Home directly,
 bypassing HA.
 
-| Plug | Drives | Path |
-|---|---|---|
-| Wi-Fi smart plug | Air shower fans | Smart Life / eWeLink → Google Home |
-| Wi-Fi smart plug | Laboratory lighting | Smart Life / eWeLink → Google Home |
-| Wi-Fi smart plug | Laboratory lighting | Smart Life / eWeLink → Google Home |
+| Plug | Drives | Path | LAN (2026-10) |
+|---|---|---|---|
+| Smart Life (Tuya) Wi-Fi plug | Air shower fans | Smart Life → Google Home | `192.168.0.24`, `bc:35:1e:69:f4:12`, TCP 6668 |
+| eWeLink Wi-Fi plug | Laboratory lighting | eWeLink → Google Home | `192.168.0.33`, id `100281d9e4` (or .34) |
+| eWeLink Wi-Fi plug | Laboratory lighting | eWeLink → Google Home | `192.168.0.34`, id `100281dc13` (or .33) |
+
+Fan plug identified 2026-10-15 (the only Tuya on the LAN). Which eWeLink plug
+drives which lab light is unconfirmed. As of 2026-10-15 the fan plug has a
+relay fault and is unplugged for a bench repair; see the strand STATE.
 
 **They cannot be seen from homepi** — no HA entity, no Matter node, no Zigbee
 join. Confirm them in the Smart Life / eWeLink / Google Home apps. Anything
