@@ -5,7 +5,7 @@
 
 air_shower:
   alias: "Air Shower Fans Profile"
-  description: "Standard air shower profile: wait delay (default 1m), run fans (default 5m), then turn off. Requires phone on home Wi-Fi BSSID / LAN."
+  description: "Standard air shower profile: 3 s fan blip, wait delay (default 1m), run fans (default 5m), then turn off. Requires phone on home Wi-Fi BSSID / LAN."
   mode: restart
   icon: mdi:fan
   sequence:
@@ -24,6 +24,15 @@ air_shower:
         {% else %}
           false
         {% endif %}
+    # 3 s blip = audible confirmation that the profile has started.
+    - service: switch.turn_on
+      target:
+        entity_id: switch.air_shower_fans
+    - delay:
+        seconds: 3
+    - service: switch.turn_off
+      target:
+        entity_id: switch.air_shower_fans
     - delay:
         minutes: 1
     - service: switch.turn_on
