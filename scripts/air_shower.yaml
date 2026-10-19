@@ -1,19 +1,29 @@
 # Home Assistant Script for Air Shower Fans
 # Execution: runs natively on homepi inside Home Assistant.
 # Mode: restart (re-triggering resets the cycle safely).
-# Condition: user must be on the LAN (Wi-Fi SSID 'Grecian2SeymourGdns' or person.peter_grecian 'home').
+# Condition: user must be on the home LAN Wi-Fi (BSSID matching eero / Comtrend APs).
 
 air_shower:
   alias: "Air Shower Fans Profile"
-  description: "Standard air shower profile: wait delay (default 1m), run fans (default 5m), then turn off. Requires user to be on home LAN/home."
+  description: "Standard air shower profile: wait delay (default 1m), run fans (default 5m), then turn off. Requires phone on home Wi-Fi BSSID / LAN."
   mode: restart
   icon: mdi:fan
   sequence:
     - condition: template
       value_template: >-
-        {{ is_state('sensor.pixel_6a_wifi_connection', 'Grecian2SeymourGdns')
-           if states('sensor.pixel_6a_wifi_connection') not in ['unavailable', 'unknown', 'none']
-           else is_state('person.peter_grecian', 'home') }}
+        {% set bssid = states('sensor.pixel_6a_wi_fi_bssid') | lower %}
+        {% set known = [
+          '74:b6:b6:e8:af:c6', '74:b6:b6:e8:af:c5',
+          '74:b6:b6:e8:25:86', '74:b6:b6:e8:25:85',
+          '1c:64:99:0b:54:34', '1c:64:99:0b:54:30'
+        ] %}
+        {% if bssid in known or bssid.startswith('74:b6:b6') or bssid.startswith('1c:64:99') %}
+          true
+        {% elif bssid in ['unknown', 'unavailable', 'none', ''] %}
+          {{ is_state('person.peter_grecian', 'home') }}
+        {% else %}
+          false
+        {% endif %}
     - delay:
         minutes: 1
     - service: switch.turn_on
