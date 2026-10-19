@@ -1,0 +1,15 @@
+# Home Assistant Script to Cancel Air Shower Fans
+# Halts script.air_shower (so it won't trigger later if in delay) and turns off the fan switch immediately.
+
+air_shower_cancel:
+  alias: "Cancel Air Shower"
+  description: "Stop any running air shower profile and turn fans off immediately."
+  mode: restart
+  icon: mdi:fan-off
+  sequence:
+    - service: script.turn_off
+      target:
+        entity_id: script.air_shower
+    - service: switch.turn_off
+      target:
+        entity_id: switch.air_shower_fans
