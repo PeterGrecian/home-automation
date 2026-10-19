@@ -76,7 +76,7 @@ harmless.
 
 ## Wi-Fi plugs — deliberately NOT in HA
 
-Three Wi-Fi smart plugs are in service but **absent from the HA device
+Four Wi-Fi smart plugs are in service but **absent from the HA device
 registry by design**, per the policy in
 [ecosystem-map.md](ecosystem-map.md#composition-one-device-one-primary-path):
 simple plugs stay in their native ecosystem and reach Google Home directly,
@@ -87,10 +87,12 @@ bypassing HA.
 | Smart Life (Tuya) Wi-Fi plug | Air shower fans | Smart Life → Google Home | `192.168.0.24`, `bc:35:1e:69:f4:12`, TCP 6668 |
 | eWeLink Wi-Fi plug | Laboratory lighting | eWeLink → Google Home | `192.168.0.33`, id `100281d9e4` (or .34) |
 | eWeLink Wi-Fi plug | Laboratory lighting | eWeLink → Google Home | `192.168.0.34`, id `100281dc13` (or .33) |
+| SONOFF S60TPG (eWeLink) | "Lamp" | eWeLink → Google Home | `192.168.0.83`, `80:f1:b2:5e:ef:40`, id `10029f4d36` |
 
 Fan plug identified 2026-10-15 (the only Tuya on the LAN). Which eWeLink plug
 drives which lab light is unconfirmed. As of 2026-10-15 the fan plug has a
 relay fault and is unplugged for a bench repair; see the strand STATE.
+The S60TPG "Lamp" plug was paired 2026-10-19 (eWeLink once, then Google Home).
 
 **They cannot be seen from homepi** — no HA entity, no Matter node, no Zigbee
 join. Confirm them in the Smart Life / eWeLink / Google Home apps. Anything
