@@ -1,0 +1,43 @@
+# Home Assistant Script for Air Shower Fans
+# Can be included in scripts.yaml on homepi or pasted into HA Settings -> Automations & Scenes -> Scripts.
+#
+# Execution: runs natively on homepi inside Home Assistant.
+# Mode: restart (re-triggering resets the cycle safely).
+
+air_shower:
+  alias: "Air Shower Fans Profile"
+  description: "Standard air shower profile: wait delay (default 1m), run fans (default 5m), then turn off."
+  mode: restart
+  icon: mdi:fan
+  fields:
+    delay_seconds:
+      name: "Delay (seconds)"
+      description: "Delay before turning fans on"
+      default: 60
+      example: 60
+      selector:
+        number:
+          min: 0
+          max: 600
+          unit_of_measurement: "s"
+    duration_seconds:
+      name: "Run duration (seconds)"
+      description: "Duration fans run before turning off"
+      default: 300
+      example: 300
+      selector:
+        number:
+          min: 10
+          max: 3600
+          unit_of_measurement: "s"
+  sequence:
+    - delay:
+        seconds: "{{ delay_seconds | default(60) }}"
+    - service: switch.turn_on
+      target:
+        entity_id: switch.air_shower_fans
+    - delay:
+        seconds: "{{ duration_seconds | default(300) }}"
+    - service: switch.turn_off
+      target:
+        entity_id: switch.air_shower_fans

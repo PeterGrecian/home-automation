@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""air-shower — air shower fan profile & control via Home Assistant REST API.
+
+Controls switch.air_shower_fans (ZHA / Sonoff S60ZBTPG smart plug on homepi).
+Runs locally from any estate host (discovers homepi via Tailnet / LAN / mDNS).
+
+Commands:
+    air-shower [run] [--delay SECONDS] [--duration SECONDS] [--now]
+                     Run timed fan profile (default: 60s delay, 300s / 5m run).
+    air-shower status
+                     Show current switch state, telemetry (power, voltage, current).
+    air-shower on
+                     Turn on fans immediately.
+    air-shower off
+                     Turn off fans immediately (with retry verification).
+    air-shower cycle [--secs N]
+                     Power cycle the plug (off -> wait N secs -> on).
+"""
+
+import argparse
+import datetime
+import json
+import os
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+import zoneinfo
+
+LONDON_TZ = zoneinfo.ZoneInfo("Europe/London")
+DEFAULT_ENTITY = "switch.air_shower_fans"
+DEFAULT_DELAY = 60       # seconds before turn-on
+DEFAULT_DURATION = 300   # seconds running
+LOG_PATH = os.path.expanduser("~/tmp/fans-run.log")
+
+HA_CANDIDATE_URLS = [
+    "http://100.127.158.37:8123",   # homepi tailnet
+    "http://192.168.0.53:8123",     # homepi LAN IP
+    "http://homepi.local:8123",     # homepi mDNS
+]
+
+
+def log(msg, to_file=True):
+    ts = datetime.datetime.now(LONDON_TZ).strftime("%Y-%m-%d %H:%M:%S %Z")
+    line = f"{ts} {msg}"
+    print(line)
+    if to_file:
+        try:
+            os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+            with open(LOG_PATH, "a") as f:
+                f.write(line + "\n")
+        except OSError:
+            pass
+
+
+def get_token():
+    """Retrieve HA long-lived access token from secrets."""
+    token = os.environ.get("HA_TOKEN")
+    if token:
+        return token.strip()
+    try:
+        out = subprocess.check_output(
+            ["secrets", "get", "/home-automation/ha-claude"],
+            stderr=subprocess.DEVNULL
+        )
+        return out.decode().strip()
+    except Exception as e:
+        sys.exit(f"Error fetching secret '/home-automation/ha-claude': {e}")
+
+
+def find_ha_base_url():
+    """Probe candidate URLs and return the first reachable Home Assistant endpoint."""
+    env_url = os.environ.get("HA_URL")
+    if env_url:
+        return env_url.rstrip("/")
+
+    for url in HA_CANDIDATE_URLS:
+        try:
+            req = urllib.request.Request(f"{url}/api/", headers={"User-Agent": "air-shower-probe"})
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                if resp.status in (200, 401):
+                    return url
+        except urllib.error.HTTPError as e:
+            if e.code == 401:  # 401 means HA is there and listening
+                return url
+        except Exception:
+            continue
+
+    # Default fallback
+    return HA_CANDIDATE_URLS[0]
+
+
+class HAClient:
+    def __init__(self, base_url, token):
+        self.base_url = base_url.rstrip("/")
+        self.token = token
+
+    def request(self, endpoint, method="GET", payload=None):
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json"
+        }
+        data = json.dumps(payload).encode("utf-8") if payload is not None else None
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                body = resp.read().decode("utf-8")
+                return json.loads(body) if body else {}
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8") if e.fp else ""
+            raise RuntimeError(f"HA HTTP {e.code} on {endpoint}: {err_body}") from e
+        except Exception as e:
+            raise RuntimeError(f"HA connection error on {endpoint}: {e}") from e
+
+    def get_state(self, entity_id):
+        return self.request(f"api/states/{entity_id}")
+
+    def turn_on(self, entity_id):
+        return self.request("api/services/switch/turn_on", method="POST", payload={"entity_id": entity_id})
+
+    def turn_off(self, entity_id):
+        return self.request("api/services/switch/turn_off", method="POST", payload={"entity_id": entity_id})
+
+
+def cmd_status(client, entity_id):
+    try:
+        sw = client.get_state(entity_id)
+        state = sw.get("state", "unknown")
+        last_changed = sw.get("last_changed", "unknown")
+    except Exception as e:
+        sys.exit(f"Failed to fetch {entity_id}: {e}")
+
+    # Telemetry sensors
+    prefix = entity_id.replace("switch.", "sensor.")
+    telemetry = {}
+    for metric in ["power", "voltage", "current"]:
+        try:
+            s = client.get_state(f"{prefix}_{metric}")
+            unit = s.get("attributes", {}).get("unit_of_measurement", "")
+            telemetry[metric] = f"{s.get('state', '?')} {unit}".strip()
+        except Exception:
+            telemetry[metric] = "n/a"
+
+    print(f"Entity:       {entity_id}")
+    print(f"State:        {state.upper()}")
+    print(f"Last changed: {last_changed}")
+    print(f"Power:        {telemetry['power']}")
+    print(f"Voltage:      {telemetry['voltage']}")
+    print(f"Current:      {telemetry['current']}")
+
+
+def cmd_on(client, entity_id):
+    log(f"Turning ON {entity_id}...")
+    client.turn_on(entity_id)
+    time.sleep(1)
+    state = client.get_state(entity_id).get("state")
+    if state == "on":
+        log(f"Verified ON: {entity_id} is on.")
+    else:
+        log(f"Warning: state is '{state}', not 'on'. Retrying...")
+        client.turn_on(entity_id)
+        time.sleep(2)
+        state = client.get_state(entity_id).get("state")
+        log(f"After retry: {state}")
+
+
+def cmd_off(client, entity_id):
+    log(f"Turning OFF {entity_id}...")
+    max_retries = 5
+    for attempt in range(1, max_retries + 1):
+        try:
+            client.turn_off(entity_id)
+        except Exception as e:
+            log(f"turn_off error attempt {attempt}: {e}")
+        time.sleep(1.5)
+        state = client.get_state(entity_id).get("state")
+        if state == "off":
+            log(f"Verified OFF: {entity_id} is off.")
+            return True
+        log(f"Attempt {attempt}: state is '{state}', retrying...")
+        time.sleep(1.5)
+
+    log(f"CRITICAL: Failed to verify {entity_id} is off after {max_retries} attempts!")
+    sys.exit(2)
+
+
+def cmd_cycle(client, entity_id, secs):
+    log(f"Cycling {entity_id} (wait {secs}s)...")
+    cmd_off(client, entity_id)
+    time.sleep(secs)
+    cmd_on(client, entity_id)
+
+
+def cmd_run(client, entity_id, delay, duration):
+    now = datetime.datetime.now(LONDON_TZ)
+    eta_on = now + datetime.timedelta(seconds=delay)
+    eta_off = eta_on + datetime.timedelta(seconds=duration)
+
+    log(f"=== Air Shower Profile ===")
+    log(f"Target entity: {entity_id}")
+    init_state = client.get_state(entity_id).get("state", "unknown")
+    log(f"Initial state: {init_state}")
+    log(f"Delay: {delay}s -> turn ON expected at {eta_on.strftime('%H:%M:%S %Z')}")
+    log(f"Duration: {duration}s -> turn OFF expected at {eta_off.strftime('%H:%M:%S %Z')}")
+
+    if delay > 0:
+        time.sleep(delay)
+
+    cmd_on(client, entity_id)
+    log(f"Running for {duration}s...")
+    time.sleep(duration)
+    cmd_off(client, entity_id)
+    log(f"=== Air Shower Profile Complete ===")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Air shower fan profile controller via Home Assistant",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument("--entity", default=DEFAULT_ENTITY, help=f"Target switch entity (default: {DEFAULT_ENTITY})")
+    parser.add_argument("--ha-url", default=None, help="Home Assistant base URL override")
+
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+
+    # run (profile)
+    p_run = subparsers.add_parser("run", help="Run timed fan profile")
+    p_run.add_argument("-d", "--delay", type=int, default=DEFAULT_DELAY, help=f"Initial delay in seconds (default: {DEFAULT_DELAY})")
+    p_run.add_argument("-t", "--duration", type=int, default=DEFAULT_DURATION, help=f"Run duration in seconds (default: {DEFAULT_DURATION})")
+    p_run.add_argument("--now", action="store_true", help="Start immediately (delay=0)")
+
+    # status
+    subparsers.add_parser("status", help="Show current fan switch & telemetry status")
+
+    # on
+    subparsers.add_parser("on", help="Turn fans ON immediately")
+
+    # off
+    subparsers.add_parser("off", help="Turn fans OFF immediately (with retry verification)")
+
+    # cycle
+    p_cycle = subparsers.add_parser("cycle", help="Power cycle fans (off -> wait -> on)")
+    p_cycle.add_argument("--secs", type=int, default=10, help="Seconds to wait while off (default: 10)")
+
+    args = parser.parse_args()
+
+    # Default to 'run' if no subcommand provided
+    if args.command is None:
+        args.command = "run"
+        args.delay = DEFAULT_DELAY
+        args.duration = DEFAULT_DURATION
+        args.now = False
+
+    ha_url = args.ha_url or find_ha_base_url()
+    token = get_token()
+    client = HAClient(ha_url, token)
+
+    if args.command == "status":
+        cmd_status(client, args.entity)
+    elif args.command == "on":
+        cmd_on(client, args.entity)
+    elif args.command == "off":
+        cmd_off(client, args.entity)
+    elif args.command == "cycle":
+        cmd_cycle(client, args.entity, args.secs)
+    elif args.command == "run":
+        delay = 0 if getattr(args, "now", False) else getattr(args, "delay", DEFAULT_DELAY)
+        duration = getattr(args, "duration", DEFAULT_DURATION)
+        cmd_run(client, args.entity, delay, duration)
+
+
+if __name__ == "__main__":
+    main()
