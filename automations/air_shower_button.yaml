@@ -1,13 +1,14 @@
 # Home Assistant automation: SONOFF SNZB-01P Zigbee button -> air shower fans.
 # Lives in automations.yaml on homepi (UI-managed file); this is the git copy.
-# The button is physically in the house, so no home-Wi-Fi gate (unlike script.air_shower).
+# The button is physically in the house, so no home-Wi-Fi gate. It is now the ONLY way to
+# start the fans (phone script and CLI start commands removed 2026-10-20: fans have heaters).
 # Mode restart: any press aborts a run in progress.
 # Button commands (verified 2026-10-19): single = toggle, double = on, long = off.
 # Long press is deliberately unused: holding ~5 s puts the button into pairing mode.
 
 - id: air_shower_button
   alias: Air Shower Button
-  description: "SNZB-01P: single = profile (3 s blip, 1 min wait, 5 min fans); double = toggle fans now (off cancels any run, on stays on until toggled)."
+  description: "SNZB-01P: single = profile (3 s blip, 1 min wait, 5 min fans); double = toggle fans now (off cancels any run, on stays on until toggled, capped at 30 min by air_shower_fans_cap)."
   mode: restart
   triggers:
     - trigger: event
@@ -33,16 +34,14 @@
         - conditions: "{{ trigger.event.data.command == 'on' }}"
           sequence:
             - if:
-                - condition: or
-                  conditions:
-                    - condition: state
-                      entity_id: switch.air_shower_fans
-                      state: "on"
-                    - condition: state
-                      entity_id: script.air_shower
-                      state: "on"
+                - condition: state
+                  entity_id: switch.air_shower_fans
+                  state: "on"
               then:
-                - action: script.air_shower_cancel
+                # Not script.air_shower_cancel: that stops this automation, i.e. its own caller.
+                # Mode restart has already aborted any running profile.
+                - action: switch.turn_off
+                  target: { entity_id: switch.air_shower_fans }
               else:
                 - action: switch.turn_on
                   target: { entity_id: switch.air_shower_fans }

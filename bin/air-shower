@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""air-shower — air shower fan profile & control via Home Assistant REST API.
+"""air-shower — air shower fan status & stop via Home Assistant REST API.
 
 Controls switch.air_shower_fans (ZHA / Sonoff S60ZBTPG smart plug on homepi).
 Runs locally from any estate host (discovers homepi via Tailnet / LAN / mDNS).
 
+Deliberately CANNOT start the fans: they have heaters (~4 kW) and must be
+overseen by a human, so the only way to start them is the Zigbee button by the
+air shower (automation.air_shower_button). run/on/cycle were removed 2026-10-20.
+
 Commands:
-    air-shower [run] [--delay SECONDS] [--duration SECONDS] [--now]
-                     Run timed fan profile (default: 60s delay, 300s / 5m run).
-    air-shower status
+    air-shower [status]
                      Show current switch state, telemetry (power, voltage, current).
-    air-shower on
-                     Turn on fans immediately.
     air-shower off
-                     Turn off fans immediately (with retry verification).
-    air-shower cycle [--secs N]
-                     Power cycle the plug (off -> wait N secs -> on).
+                     Stop any running profile and turn fans off (with retry verification).
 """
 
 import argparse
@@ -30,8 +28,7 @@ import zoneinfo
 
 LONDON_TZ = zoneinfo.ZoneInfo("Europe/London")
 DEFAULT_ENTITY = "switch.air_shower_fans"
-DEFAULT_DELAY = 60       # seconds before turn-on
-DEFAULT_DURATION = 300   # seconds running
+CANCEL_SCRIPT = "air_shower_cancel"   # turns fans off AND stops a running button profile
 LOG_PATH = os.path.expanduser("~/tmp/fans-run.log")
 
 HA_CANDIDATE_URLS = [
@@ -117,11 +114,11 @@ class HAClient:
     def get_state(self, entity_id):
         return self.request(f"api/states/{entity_id}")
 
-    def turn_on(self, entity_id):
-        return self.request("api/services/switch/turn_on", method="POST", payload={"entity_id": entity_id})
-
     def turn_off(self, entity_id):
         return self.request("api/services/switch/turn_off", method="POST", payload={"entity_id": entity_id})
+
+    def cancel(self):
+        return self.request(f"api/services/script/{CANCEL_SCRIPT}", method="POST", payload={})
 
 
 def cmd_status(client, entity_id):
@@ -146,28 +143,19 @@ def cmd_status(client, entity_id):
     print(f"Entity:       {entity_id}")
     print(f"State:        {state.upper()}")
     print(f"Last changed: {last_changed}")
-    print(f"Power:        {telemetry['power']}")
+    # The S60ZBTPG does not zero its meter on switch-off: when OFF these are the last on-readings.
+    stale = "  (last reading while on)" if state == "off" else ""
+    print(f"Power:        {telemetry['power']}{stale}")
     print(f"Voltage:      {telemetry['voltage']}")
     print(f"Current:      {telemetry['current']}")
 
 
-def cmd_on(client, entity_id):
-    log(f"Turning ON {entity_id}...")
-    client.turn_on(entity_id)
-    time.sleep(1)
-    state = client.get_state(entity_id).get("state")
-    if state == "on":
-        log(f"Verified ON: {entity_id} is on.")
-    else:
-        log(f"Warning: state is '{state}', not 'on'. Retrying...")
-        client.turn_on(entity_id)
-        time.sleep(2)
-        state = client.get_state(entity_id).get("state")
-        log(f"After retry: {state}")
-
-
 def cmd_off(client, entity_id):
     log(f"Turning OFF {entity_id}...")
+    try:
+        client.cancel()   # without this a running button profile turns the fans back on
+    except Exception as e:
+        log(f"script.{CANCEL_SCRIPT} failed ({e}); falling back to switch.turn_off")
     max_retries = 5
     for attempt in range(1, max_retries + 1):
         try:
@@ -186,38 +174,9 @@ def cmd_off(client, entity_id):
     sys.exit(2)
 
 
-def cmd_cycle(client, entity_id, secs):
-    log(f"Cycling {entity_id} (wait {secs}s)...")
-    cmd_off(client, entity_id)
-    time.sleep(secs)
-    cmd_on(client, entity_id)
-
-
-def cmd_run(client, entity_id, delay, duration):
-    now = datetime.datetime.now(LONDON_TZ)
-    eta_on = now + datetime.timedelta(seconds=delay)
-    eta_off = eta_on + datetime.timedelta(seconds=duration)
-
-    log(f"=== Air Shower Profile ===")
-    log(f"Target entity: {entity_id}")
-    init_state = client.get_state(entity_id).get("state", "unknown")
-    log(f"Initial state: {init_state}")
-    log(f"Delay: {delay}s -> turn ON expected at {eta_on.strftime('%H:%M:%S %Z')}")
-    log(f"Duration: {duration}s -> turn OFF expected at {eta_off.strftime('%H:%M:%S %Z')}")
-
-    if delay > 0:
-        time.sleep(delay)
-
-    cmd_on(client, entity_id)
-    log(f"Running for {duration}s...")
-    time.sleep(duration)
-    cmd_off(client, entity_id)
-    log(f"=== Air Shower Profile Complete ===")
-
-
 def main():
     parser = argparse.ArgumentParser(
-        description="Air shower fan profile controller via Home Assistant",
+        description="Air shower fan status & stop via Home Assistant (cannot start the fans)",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("--entity", default=DEFAULT_ENTITY, help=f"Target switch entity (default: {DEFAULT_ENTITY})")
@@ -225,33 +184,16 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 
-    # run (profile)
-    p_run = subparsers.add_parser("run", help="Run timed fan profile")
-    p_run.add_argument("-d", "--delay", type=int, default=DEFAULT_DELAY, help=f"Initial delay in seconds (default: {DEFAULT_DELAY})")
-    p_run.add_argument("-t", "--duration", type=int, default=DEFAULT_DURATION, help=f"Run duration in seconds (default: {DEFAULT_DURATION})")
-    p_run.add_argument("--now", action="store_true", help="Start immediately (delay=0)")
-
     # status
     subparsers.add_parser("status", help="Show current fan switch & telemetry status")
-
-    # on
-    subparsers.add_parser("on", help="Turn fans ON immediately")
 
     # off
     subparsers.add_parser("off", help="Turn fans OFF immediately (with retry verification)")
 
-    # cycle
-    p_cycle = subparsers.add_parser("cycle", help="Power cycle fans (off -> wait -> on)")
-    p_cycle.add_argument("--secs", type=int, default=10, help="Seconds to wait while off (default: 10)")
-
     args = parser.parse_args()
 
-    # Default to 'run' if no subcommand provided
     if args.command is None:
-        args.command = "run"
-        args.delay = DEFAULT_DELAY
-        args.duration = DEFAULT_DURATION
-        args.now = False
+        args.command = "status"
 
     ha_url = args.ha_url or find_ha_base_url()
     token = get_token()
@@ -259,17 +201,8 @@ def main():
 
     if args.command == "status":
         cmd_status(client, args.entity)
-    elif args.command == "on":
-        cmd_on(client, args.entity)
     elif args.command == "off":
         cmd_off(client, args.entity)
-    elif args.command == "cycle":
-        cmd_cycle(client, args.entity, args.secs)
-    elif args.command == "run":
-        delay = 0 if getattr(args, "now", False) else getattr(args, "delay", DEFAULT_DELAY)
-        duration = getattr(args, "duration", DEFAULT_DURATION)
-        cmd_run(client, args.entity, delay, duration)
-
 
 if __name__ == "__main__":
     main()

@@ -1,5 +1,7 @@
 # Home Assistant Script to Cancel Air Shower Fans
-# Halts script.air_shower (so it won't trigger later if in delay) and turns off the fan switch immediately.
+# Turns the fans off, then stops a running button profile so it cannot turn them back on.
+# Off is always safe, so this is the one air-shower action left callable remotely.
+# Do NOT call it from automation.air_shower_button: it stops that automation (its caller).
 
 air_shower_cancel:
   alias: "Cancel Air Shower"
@@ -7,9 +9,14 @@ air_shower_cancel:
   mode: restart
   icon: mdi:fan-off
   sequence:
-    - service: script.turn_off
-      target:
-        entity_id: script.air_shower
     - service: switch.turn_off
       target:
         entity_id: switch.air_shower_fans
+    - service: automation.turn_off
+      target:
+        entity_id: automation.air_shower_button
+      data:
+        stop_actions: true
+    - service: automation.turn_on
+      target:
+        entity_id: automation.air_shower_button

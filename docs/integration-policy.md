@@ -37,8 +37,11 @@ The two lab WiFi Sonoffs stay outside HA: voice + schedule via Google Home is en
 
 **Where Google Home ends and HA starts** (the `TODO.md` question):
 
-- **Google Home owns voice.** The three Wi-Fi plugs (air shower fans, ×2 lab
-  lighting) publish straight to Google via Smart Life/eWeLink. HA is not in
+- **Google Home owns voice.** The Wi-Fi plugs (×2 lab lighting, and since
+  2026-10-19 the S60TPG "lamp") publish straight to Google via eWeLink. (The
+  air shower fans were the third until their Smart Life plug failed; since
+  2026-10-17 they are a Zigbee plug in HA, button-only and deliberately
+  voiceless because they have heaters.) HA is not in
   that chain and doesn't need to be — **lab lighting already has working voice
   control today.**
 - **HA owns logic and history.** Zigbee plugs, the Matter plug, sensors,
@@ -90,6 +93,10 @@ Then add a Zigbee button (ZHA, coordinator already present) bound to the
 plug's HA entity. Status: **decided, not yet bought or built.**
 
 ### Why the fans are reliable and everything else barfs
+
+*(Written 2026-08-09, when the fans were on a Smart Life plug. That plug
+failed in October 2026 and the fans are now on Zigbee in HA, so the example is
+historical; the chain-length argument still stands.)*
 
 Chain length. The air-shower fans are **plug → Smart Life → Google Home**:
 three components, one vendor path, no HA. Every layer is a failure point, and

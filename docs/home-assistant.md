@@ -28,7 +28,15 @@ Both expose power/voltage/current/summation sensors, which is the entire reason 
 
 ### The lab Wi-Fi plugs are outside HA
 
-Three Wi-Fi plugs exist — air shower fans, and two for lab lighting — reached via Smart Life/eWeLink → Google Home, bypassing HA by design ([ecosystem-map.md](ecosystem-map.md)). **They have no HA entity**, so they cannot be scripted, automated, or driven by an HA button.
+Three Wi-Fi plugs are in service — two for lab lighting and the S60TPG "lamp" — reached via eWeLink → Google Home, bypassing HA by design ([ecosystem-map.md](ecosystem-map.md)). **They have no HA entity**, so they cannot be scripted, automated, or driven by an HA button. (The air shower fans used to be a fourth, a Smart Life plug; it failed in October 2026 and the fans are now in HA, below.)
+
+### Air shower fans: Zigbee, button-only start
+
+`switch.air_shower_fans` is a SONOFF S60ZBTPG in ZHA. **The fans have heaters (~4 kW nameplate, ~2.9 kW / 12.5 A measured), so they must be overseen by a human: the only way to start them is the SNZB-01P Zigbee button by the air shower** (`automation.air_shower_button`; single = 3 s blip, 1 min wait, 5 min run; double = toggle). Nothing remote can start them — the phone script was deleted 2026-10-20 and the `air-shower` CLI can only `status` and `off`. Stopping is always allowed remotely: `script.air_shower_cancel` turns the switch off and stops a running button profile (never call it *from* the button automation — it would stop its own caller). `automation.air_shower_fans_cap` turns the fans off after 30 min on, whatever started them. No voice, by choice.
+
+**Load warning:** the heater load is at or above what a 13 A plug is rated for (S60ZBTPG 3.25 kW); it probably killed the previous fan plug. A contactor or a separate heater supply is pending.
+
+The S60ZBTPG does not zero its meter on switch-off: an OFF plug keeps showing its last on-reading.
 
 An earlier version of this table listed two of them as HA plugs, with `switch.sonoff_s60zbtpg` as the "Lights East" entity. No such switch entity exists — the tumble dryer's switch is `switch.tumble_dryer`; only its *sensors* kept the generic `sonoff_s60zbtpg` name. What did exist was `light.lights_east`, a `switch_as_x` helper wrapping `switch.tumble_dryer`, so "Lights East" switched the **dryer**, not any lab light. The helper was deleted 2026-08-10.
 

@@ -1,0 +1,19 @@
+# Home Assistant automation: hard cap on air shower fan run time.
+# Lives in automations.yaml on homepi (UI-managed file); this is the git copy.
+# The fans have heaters (~4 kW nameplate, ~2.9 kW measured), so they must never
+# run unattended. Covers every path: double-press "on", the HA UI, the switch itself.
+# The button's single-press profile (5 min) never reaches it.
+# Caveat: a `for:` timer does not survive an HA restart.
+
+- id: air_shower_fans_cap
+  alias: Air Shower Fans Cap
+  description: "Turn the air shower fans off after 30 min on, whatever turned them on."
+  mode: single
+  triggers:
+    - trigger: state
+      entity_id: switch.air_shower_fans
+      to: "on"
+      for: { minutes: 30 }
+  actions:
+    - action: switch.turn_off
+      target: { entity_id: switch.air_shower_fans }

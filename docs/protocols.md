@@ -64,8 +64,9 @@ Most of them. Being Wi-Fi says nothing about the language:
 - **Google Cast** (13 devices) — Cast protocol, local, not Matter
 - **eero** — UPnP/SSDP, read-only stats
 - **iEAST AudioCast** — DLNA/UPnP media renderer
-- **The three Wi-Fi plugs** (air shower fans, 2 × lab lighting) — Smart Life
-  (Tuya) or eWeLink cloud. **Not in HA at all**, by design.
+- **The three Wi-Fi plugs** (2 × lab lighting, the S60TPG "lamp") — eWeLink
+  cloud with LAN mode. **Not in HA at all**, by design. (The air shower fans'
+  Smart Life/Tuya plug failed 2026-10; the fans are now a Zigbee S60ZBTPG.)
 
 ### The Google speakers — voice vs Thread
 
