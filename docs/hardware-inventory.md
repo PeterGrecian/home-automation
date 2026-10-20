@@ -103,6 +103,36 @@ join. Confirm them in the Smart Life / eWeLink / Google Home apps. Anything
 built from the HA registry alone (including the tables above) will miss them;
 that is the expected outcome of the bypass policy, not a fault.
 
+## Pairing & setup codes
+
+One row per **live** device: how it pairs, how it resets, and where its setup
+code is. Thrown-away kit is left out. **This repo is public, so codes never go
+here**: they live in `secrets` under `/home-automation/setup-codes/<device>`
+(Matter: the `MT:…` QR string plus the 11-digit manual code). A factory reset
+needs no code, but pairing again afterwards does, so **record the code when the
+device is paired**, then the box can go.
+
+| Device | Radio | Pairs into | Reset / pair | Setup code |
+|---|---|---|---|---|
+| Washing Machine (S60ZBTPG) | Zigbee | ZHA | permit-join, hold button ~5 s | none (Zigbee) |
+| Tumble Dryer (S60ZBTPG) | Zigbee | ZHA | permit-join, hold button ~5 s | none (Zigbee) |
+| Air Shower Fans (S60ZBTPG) | Zigbee | ZHA | permit-join, hold button ~5 s | none (Zigbee) |
+| Air Shower Button (SNZB-01P) | Zigbee | ZHA | permit-join, hold button ~5 s | none (Zigbee) |
+| Lab Temperature (SNZB-02D) | Zigbee | ZHA | permit-join, hold button ~5 s | none (Zigbee) |
+| eWeLink TH01 | Zigbee | ZHA | permit-join, hold button ~5 s | none (Zigbee) |
+| Lab lighting ×2 (eWeLink Wi-Fi) | Wi-Fi | eWeLink app → Google Home | eWeLink app flow | none (app account) |
+| Lamp (S60TPG) | Wi-Fi | eWeLink app → Google Home | eWeLink app flow | none (app account) |
+| Second S60TPG (lamp's sibling, unpaired?) | Wi-Fi | eWeLink app → Google Home | eWeLink app flow | none; body QR is only serial `25470400033763` |
+| IKEA BILRESA button | Thread | needs a Thread BR | reset button in battery bay | `setup-codes/ikea-bilresa` (QR + manual) |
+| IKEA GRILLPLATS plug | Thread | needs a Thread BR | hold button 10 s | `setup-codes/ikea-grillplats` (manual) |
+| IKEA KAJPLATS E14 bulb | Thread | needs a Thread BR | power cycles | `setup-codes/ikea-kajplats-e14` (manual) |
+
+Zigbee needs no code: the hub opens a join window (`zha.permit`) and the
+device joins. Matter needs the code once per pairing; a device already paired can
+be shared to a second controller with a fresh code from the first one
+(Google Home "Linked Matter apps", or the matter-server's
+`open_commissioning_window`), so the printed code matters only after a reset.
+
 ## Google Cast
 
 Media endpoints, used for TTS alerts. Not controllable hardware.
